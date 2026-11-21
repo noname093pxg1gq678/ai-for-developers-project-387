@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/compare/v1.0.0...v1.1.0) (2026-11-21)
+
+
+### Features
+
+* **frontend:** meta description на страницах ([#27](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/27)) ([fae03cc](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/fae03ccec6809ce217055531f50a0b994412de2f))
+
+
+### Bug Fixes
+
+* **agent:** agent-branch.txt обязателен при любом коммите в PR-режиме ([#26](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/26)) ([f7ee56b](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/f7ee56b64c3953414ae6d08edd34853d6ec5a517))
+* **agent:** Publish answer всегда публикует ответ, Publish work сообщает причину сбоя ([#26](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/26)) ([6d69986](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/6d69986baea85c57aff307430c23933667cfbf83))
+* **agent:** публикация ответа и причин сбоя Publish work ([#26](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/26)) ([9261cad](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/9261cad7f6b2ca5d0b19e4e39f5ceff1998f6781))
+* **frontend:** контраст текста карточек публичной страницы ([#26](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/26)) ([2b1091f](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/2b1091fd6ad367f68417d2a9cfc005802f90e617))
+* **seo:** добавить robots.txt в сборку фронтенда ([#28](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/28)) ([91b41f5](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/91b41f5128543436c1019720fd167dd95da39feb))
+
 ## 1.0.0 (2026-11-21)
 
 
