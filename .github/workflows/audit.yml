@@ -22,7 +22,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AUDIT_URL: https://call-booking-production-85a10cee.up.railway.app
+  # Аудит проверяет опубликованное приложение этого проекта (сервис call-booking-387)
+  AUDIT_URL: https://call-booking-387-production.up.railway.app
   MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

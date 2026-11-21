@@ -8,7 +8,7 @@
 
 Исходный проект: https://github.com/noname093pxg1gq678/ai-for-developers-project-386 - в его трекере история спецификации и решений, по нему собраны ссылки на спеки и закрывающие комментарии тикетов. Словарь (`GLOSSARY.md`) и решения (`docs/adr/`) перенесены в этот репозиторий.
 
-Работающее приложение первого проекта: **https://call-booking-production-85a10cee.up.railway.app** - тот же Docker-образ из корневого `Dockerfile`, деплой на Railway из ветки main. Данные хранятся в памяти процесса: перезапуск сервиса сбрасывает типы встреч и бронирования.
+Работающее приложение этого проекта: **https://call-booking-387-production.up.railway.app** - Docker-образ из корневого `Dockerfile`, отдельный сервис `call-booking-387` на Railway, деплой из ветки main. Приложение первого проекта продолжает работать на https://call-booking-production-85a10cee.up.railway.app. Данные хранятся в памяти процесса: перезапуск сервиса сбрасывает типы встреч и бронирования.
 
 Учебный проект Хекслета: https://ru.hexlet.io/programs/ai-for-developers
 Как это должно работать: https://files.hexlet.app/a/2ipc5m
@@ -46,7 +46,7 @@ docker build -t call-booking .
 docker run --rm -p 3000:3000 call-booking
 ```
 
-Работающая версия: https://call-booking-production-85a10cee.up.railway.app
+Работающая версия: https://call-booking-387-production.up.railway.app
 
 ## Агент в GitHub
 
