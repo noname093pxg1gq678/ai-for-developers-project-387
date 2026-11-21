@@ -2,6 +2,7 @@
   "printWidth": 80,
   "ignorePatterns": [
     "package-lock.json",
+    "CHANGELOG.md",
     ".github/workflows/hexlet-check.yml",
     ".github/workflows/README.md",
     "contract/generated/**",
