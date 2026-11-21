@@ -1,0 +1,135 @@
+name: pr-review
+
+# Авторевью PR: агент читает REVIEW.md, тело PR со ссылками на спеку/issue,
+# diff и статусы CI и публикует замечания. Результат публикует отдельный
+# модель-фри шаг через gh pr comment: модель готовит текст, публикация - за
+# воркфлоу (эталонный паттерн из issue-агента).
+#
+# Таксономия событий: авторевью - отдельное событие pull_request, оно не
+# меняет код и не реагирует на комментарии (в том числе к строкам) - правки
+# только по команде человека, это канал agent.yml. Новое событие PR
+# (synchronize) отменяет устаревшее ревью через concurrency.
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions: {}
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      should_review: ${{ steps.guard.outputs.should_review }}
+    steps:
+      - name: Check fork filter
+        id: guard
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Ревью только для веток своего репозитория: у PR из недоверенного
+          # форка секрет модели не выдаётся. Авторов-ботов НЕ фильтруем:
+          # PR самого агента (автор github-actions[bot]) тоже получает авторевью
+          if [ "$HEAD_REPO" = "$REPO" ]; then
+            echo "should_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  review:
+    needs: guard
+    if: needs.guard.outputs.should_review == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      actions: read
+      checks: read
+      statuses: read
+      pull-requests: write
+    steps:
+      # Чекаутим именно head SHA: ревьюем код, который предлагается в PR
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - run: mise run setup
+
+      # opencode-ai зафиксирован в mise.toml - mise-action ставит его вместе
+      # с остальными инструментами. mise ставит npm-пакеты без postinstall,
+      # а тот скачивает бинарник платформы - запускаем вручную (см. agent.yml)
+      - name: Finalize opencode install
+        run: |
+          root="$(mise where npm:opencode-ai)"
+          postinstall="$(find "$root" -name postinstall.mjs -path '*opencode-ai*' | head -n 1)"
+          cd "$(dirname "$postinstall")"
+          node postinstall.mjs
+
+      - name: Gather review context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh pr view "$PR_NUMBER" --json title,body --jq '"## Тело PR\n\nЗаголовок: " + .title + "\n\n" + .body' > pr-body.md
+          gh pr diff "$PR_NUMBER" > pr-diff.txt
+          # Статусы CI: таблица проверок head-коммита; при падении проверок
+          # gh pr checks возвращает ненулевой код, текст всё равно нужен агенту
+          gh pr checks "$PR_NUMBER" > pr-checks.txt 2>&1 || true
+          gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/status" --jq '.state + " (" + (.statuses | length | tostring) + " statuses)"' > pr-status.txt || true
+
+      - name: Build review prompt
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "Проведи ревью PR #${PR_NUMBER}. Тебе даны: критерии ревью (REVIEW.md), тело PR со ссылками на спеку/issue, diff PR и статусы CI."
+            echo
+            echo "## Критерии ревью (REVIEW.md)"
+            cat REVIEW.md
+            echo
+            cat pr-body.md
+            echo
+            echo "## Diff PR"
+            cat pr-diff.txt
+            echo
+            echo "## Статусы CI"
+            cat pr-status.txt
+            cat pr-checks.txt
+            echo
+            cat .github/scripts/review-rules.txt
+          } > review-prompt.txt
+
+      - name: Run review agent
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          opencode run -m opencode-go/glm-5.3-flash "$(cat review-prompt.txt)" > review-answer.md
+
+      # Публикация без модели: отдельный шаг от имени воркфлоу
+      - name: Publish review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -s review-answer.md ]; then
+            gh pr comment "$PR_NUMBER" --body-file review-answer.md
+          else
+            gh pr comment "$PR_NUMBER" --body "Авторевью завершилось без текстового ответа; лог прогона - в Actions."
+          fi
