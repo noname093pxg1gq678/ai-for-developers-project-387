@@ -25,6 +25,8 @@ jobs:
       - run: mise run setup
       - run: mise run check
       - run: npm run contract:check
+      - run: mise run test:relay
+      - run: mise run test:guard
       - run: bash .github/scripts/agent-guard.test.sh
 
   docker:
