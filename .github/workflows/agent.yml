@@ -102,7 +102,8 @@ jobs:
             jq --arg l "$login" --arg p "$perm" '. + {($l): $p}' perms.json > perms.json.tmp && mv perms.json.tmp perms.json
           done <<< "$logins"
 
-          export COMMENTS_JSON="$(jq --slurpfile p perms.json 'map(. + {author_permission: ($p[0][.user.login] // "")})' comments.json)"
+          COMMENTS_JSON="$(jq --slurpfile p perms.json 'map(. + {author_permission: ($p[0][.user.login] // "")})' comments.json)"
+          export COMMENTS_JSON
           bash .github/scripts/agent-budget.sh >> "$GITHUB_OUTPUT"
 
           last_sha="$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)"
