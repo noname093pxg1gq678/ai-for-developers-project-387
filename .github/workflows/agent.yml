@@ -251,13 +251,13 @@ jobs:
           IS_PR: ${{ needs.guard.outputs.is_pr }}
         run: |
           branch="$(tr -d '[:space:]' < agent-branch.txt)"
-          # PR от github-actions[bot] не запускает новые воркфлоу, поэтому пуш
-          # всегда под токеном владельца: head-ветка PR обновляется и CI стартует
+          # Пуш и создание PR - оба под токеном владельца: PR от github-actions[bot]
+          # не запускает новые воркфлоу (авторевью уходит в action_required)
           git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
           if [ "$IS_PR" = "true" ]; then
             gh pr comment "$NUMBER" --body "Агент запушил изменения в head-ветку PR: ${branch}. Повторное ревью запустится с новым push."
           else
-            gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${NUMBER}" --body "Автоматическая работа агента по issue #${NUMBER}; ответ агента - в issue."
+            GH_TOKEN="$PUSH_TOKEN" gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${NUMBER}" --body "Автоматическая работа агента по issue #${NUMBER}; ответ агента - в issue."
           fi
 
       - name: Publish answer
