@@ -310,6 +310,13 @@ export default function AdminPage() {
                 <Text size="lg" fw={600}>
                   {meeting.typeTitle}
                 </Text>
+                {/* Тема разговора заметно выделена и идёт перед именем
+                    гостя (issue #4). */}
+                {meeting.topic && (
+                  <Text size="lg" fw={600}>
+                    {meeting.topic}
+                  </Text>
+                )}
                 <Text size="sm">{meeting.guestName}</Text>
                 {meeting.comment && (
                   <Text size="sm" c="dimmed">
