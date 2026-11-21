@@ -52,6 +52,16 @@ G_EVENT=issue G_USER=alice G_LABELS=2 G_MEMBER=true G_BODY='' check 'labeled iss
 G_EVENT=issue G_USER=project_12_bot_5f4a2b G_LABELS=0 G_MEMBER=true G_BODY='' check 'bot issue: not trusted' false ''
 G_EVENT=issue G_USER=alice G_LABELS=0 G_MEMBER=false G_BODY='' check 'not member issue: not trusted' false ''
 
+# merge_request-события: авторевью (без команды, доверенность от релея)
+G_EVENT=merge_request G_USER=alice G_LABELS=0 G_MEMBER=true G_BODY='' check 'mr review event: trusted' true ''
+G_EVENT=merge_request G_USER=project_12_bot_5f4a2b G_LABELS=0 G_MEMBER=true G_BODY='' check 'bot mr: not trusted' false ''
+G_EVENT=merge_request G_USER=alice G_LABELS=0 G_MEMBER=false G_BODY='' check 'not member mr: not trusted' false ''
+
+# mr_note-события: команда к MR (правки в head-ветку MR)
+G_EVENT=mr_note G_USER=alice G_LABELS=0 G_MEMBER=true G_BODY='/oc поправь контраст' check 'mr command /oc' true 'поправь контраст'
+G_EVENT=mr_note G_USER=alice G_LABELS=0 G_MEMBER=true G_BODY='просто комментарий' check 'mr not a command' false ''
+G_EVENT=mr_note G_USER=agent-bot G_LABELS=0 G_MEMBER=true G_BODY='/oc привет' check 'bot mr command: not trusted' false 'привет'
+
 echo '----'
 echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

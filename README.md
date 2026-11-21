@@ -104,26 +104,39 @@ docker run --rm -p 3000:3000 call-booking
 
 ### Что живёт где
 
-- **Вебхук-релей** (`gitlab/relay/`) - отдельный сервис, живёт вне приложения и вне репозитория проекта: собственный Docker-образ, слушает `POST /webhook` от self-hosted GitLab (события `issue` и `note`), проверяет секрет вебхука, применяет guard-фильтры и для доверенных запускает пайплайн через GitLab API
-- **Пайплайн** (`.gitlab-ci.yml`) - три джобы в репозитории проекта: `guard-dotenv` (сводит переменные релея в dotenv-артефакт, секретов нет), `agent` (OpenCode CLI + скиллы из чекаута + `glab`), `publish` (пуш ветки токеном доставки + MR через API)
-- **Трекер** - `glab` вместо `gh` (инструкция: `docs/agents/issue-tracker-gitlab.md`); агентские правила для GitLab-контура - `gitlab/agent-rules-glab.txt` (GitHub-версии не тронуты)
-- **События:** `note` в issue с командой `@agent` / `/oc` / `/opencode` - запуск агента; новый `issue` без меток - автотриаж. Ответ агента публикуется комментарием в том же issue
+- **Вебхук-релей** (`gitlab/relay/`) - отдельный сервис, живёт вне приложения и вне репозитория проекта: собственный Docker-образ, слушает `POST /webhook` от self-hosted GitLab (события `issue`, `note` и `merge_request`), проверяет секрет вебхука, применяет guard-фильтры и для доверенных запускает пайплайн через GitLab API
+- **Пайплайн** (`.gitlab-ci.yml`) - полный перенос контура GitHub Actions: агентные джобы (см. ниже), CI-проверки `check` (эквивалент check.yml), `review` и `runtime-check` (эквивалент pr-review.yml), `audit` (эквивалент audit.yml), `release-please` (эквивалент release-please.yml)
+- **Трекер** - `glab` вместо `gh` (инструкция: `docs/agents/issue-tracker-gitlab.md`); агентские правила: `gitlab/agent-rules-glab.txt` (issue-режим) и `gitlab/agent-mr-rules-glab.txt` (MR-режим); промпт аудита - `gitlab/audit-prompt-glab.txt`; шаблон MR - `.gitlab/merge_request_templates/Default.md` (аналог PR-шаблона)
+- **События:**
+  - `note` в issue с командой `@agent` / `/oc` / `/opencode` - запуск агента; ответ - комментарий в том же issue
+  - новый `issue` без меток - автотриаж
+  - `merge_request` (open/reopen/update) - авторевью MR по `REVIEW.md` + `runtime-check` (сборка и e2e на head SHA, артефакт с SHA и скриншотами)
+  - `note` к MR с командой - правки агента в head-ветку MR; бюджет командных комментариев (3 на MR) считает релей, сверх лимита публикуется отказ
+
+### Правила пайплайнов (важное отличие от GitHub)
+
+GitLab вычисляет `rules` при создании пайплайна, до выполнения джоб: переменные из dotenv-артефактов предыдущих джоб в правилах недоступны. Поэтому гейты переезжают внутрь скриптов: `agent` прогоняет guard-скрипт и завершается без запуска модели при недоверенном событии (defense in depth поверх фильтров релея), `publish` не публикует, если агент не сдал ветку. В `rules` используются только переменные, заданные релеем при запуске пайплайна.
 
 ### Guard-фильтры
 
-Доверенное событие: автор не бот, участник проекта с ролью Developer+ (проверка через GitLab API релейным токеном), для `note` - команда с непустым текстом после префикса (кириллические гомоглифы префикса допускаются), для `issue` - отсутствие меток. Ответ релея: 202 - принято, 403 - не доверенный, 204 - не команда (без деталей наружу). Guard-логика идентична GitHub-версии (`.github/scripts/agent-guard.sh`) и покрыта тестами (`mise run test:relay`).
+Доверенное событие: автор не бот, участник проекта с ролью Developer+ (проверка через GitLab API релейным токеном), для `note`/`mr_note` - команда с непустым текстом после префикса (кириллические гомоглифы префикса допускаются), для `issue` - отсутствие меток, для `merge_request` - не черновик и не из форка (source_project_id = id проекта). Бюджет команд на MR: релей считает предыдущие доверенные командные комментарии MR; боты в бюджет не входят; сверх лимита агент не запускается и публикуется причина. Ответ релея: 202 - принято, 403 - не доверенный, 204 - не событие для агента (без деталей наружу). Guard-логика идентична GitHub-версии (`.github/scripts/agent-guard.sh`) и покрыта тестами (`mise run test:relay`).
 
 ### Ограничения и безопасность
 
-- `timeout` на каждой джобе (agent 20m, guard и publish 5m), `resource_group: issue-$IID` - прогоны одного тикета не пересекаются (аналог GitHub concurrency)
-- CI_JOB_TOKEN вбит раннером в remote чекаута: модель могла бы его извлечь, поэтому agent-джоба делает `git remote remove origin` до запуска модели. Коммиты модели упакуются в bundle-артефакт, пуш и MR делает `publish`-джоба
+- `timeout` на каждой джобе (agent 20m, guard и publish 5m, review 15m, check 45m, audit 25m), `resource_group: issue-$IID` - прогоны одного тикета не пересекаются (аналог GitHub concurrency)
+- CI_JOB_TOKEN вбит раннером в remote чекаута: модель могла бы его извлечь, поэтому agent/review-джобы делают `git remote remove origin` до запуска модели (в MR-режиме head-ветка чекаутится до удаления). Коммиты модели упакуются в bundle-артефакт, пуш делает `publish`-джоба
 - Токен пуша модель не видит: PUSH_TOKEN существует только в publish-джобе. Токен агент-джобы (AGENT_GITLAB_TOKEN) имеет scope `api` без `write_repository` - метки, комментарии и ответы да, пуш нет
+- Сбор аудита падает мягко: недоступность приложения не роняет джобу - агент размечает это отдельно как отсутствие данных (это не подтверждает исправление дефекта). Дубликатоустойчивость, регрессии и учебный режим - как в GitHub-версии аудита
 
 ### Порядок подключения
 
-1. Перенести репозиторий на self-hosted GitLab: `.gitlab-ci.yml` активируется автоматически (пайплайны на push отключены правилом `workflow: rules` - собирается только по событию от релея)
-2. Поднять релей: `docker build -t gitlab-relay gitlab/relay` и запустить с переменными из чек-листа ниже; вебхук GitLab -> `https://<релей>/webhook` на события `issue` и `note` с секретом `WEBHOOK_SECRET`
-3. Создать три project access token'а и CI/CD-переменные (все masked + protected, кроме адреса)
+1. Перенести репозиторий на self-hosted GitLab: `.gitlab-ci.yml` активируется автоматически (CI-проверки запускаются на push в main и на MR, агентный контур - только по событиям от релея)
+2. Поднять релей: `docker build -t gitlab-relay gitlab/relay` и запустить с переменными из чек-листа ниже; вебхук GitLab -> `https://<релей>/webhook` на события `issue`, `note` и `merge request` с секретом `WEBHOOK_SECRET`
+3. Создать project access token'ы и CI/CD-переменные (все masked + protected, кроме адреса)
+4. Защитить ветку `main`: protected branch с запретом push (все изменения через MR) и требованием одобрения MR (Settings -> Repository -> Protected branches; эквивалент branch protection GitHub)
+5. Включить шаблон MR: Settings -> Merge requests -> Default description template = Default
+6. Создать tracking-issue планового аудита и записать его номер в CI/CD-переменную `AUDIT_TRACKING_ISSUE`; создать расписание пайплайна (CI/CD -> Schedules) не чаще раза в сутки для прогона `audit`
+7. Релизы: ручной запуск пайплайна из main с переменной `RELEASE=true` прогоняет release-please; флаги release-please для self-hosted-инстанса сверить при подключении
 
 ### Чек-лист переменных и токенов владельца
 
@@ -131,12 +144,15 @@ docker run --rm -p 3000:3000 call-booking
 | ---------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------- |
 | Адрес GitLab           | GitLab -> релей, CI                  | `GITLAB_URL` релея, вебхук и remote                                                          |
 | `WEBHOOK_SECRET`       | CI/CD-переменная + настройка вебхука | Проверка запросов вебхука релеем                                                             |
-| `GITLAB_TOKEN` (релей) | env релея                            | Project access token, scope `api`: участники и запуск пайплайна                              |
-| `OPENCODE_API_KEY`     | CI/CD-переменная agent-джобы         | Ключ модели (OpenCode Go из console.opencode.ai)                                             |
-| `AGENT_GITLAB_TOKEN`   | CI/CD-переменная agent-джобы         | Project access token, scope `api` (без `write_repository`): метки, комментарии, ответ агента |
-| `PUSH_TOKEN`           | CI/CD-переменная publish-джобы       | Project access token, scope `api` + `write_repository`: пуш ветки и MR; модель его не видит  |
+| `GITLAB_TOKEN` (релей) | env релея                            | Project access token, scope `api`: участники, комментарии MR, запуск пайплайна               |
+| `OPENCODE_API_KEY`     | CI/CD-переменная                     | Ключ модели (OpenCode Go из console.opencode.ai)                                             |
+| `AGENT_GITLAB_TOKEN`   | CI/CD-переменная                     | Project access token, scope `api` (без `write_repository`): метки, комментарии, ответ агента |
+| `PUSH_TOKEN`           | CI/CD-переменная                     | Project access token, scope `api` + `write_repository`: пуш ветки и MR; модель его не видит  |
+| `RELEASE_TOKEN`        | CI/CD-переменная                     | Project access token для release-please (write_repository + api)                             |
+| `AUDIT_TRACKING_ISSUE` | CI/CD-переменная                     | Номер issue аудита для публикации итогов прогонов                                            |
+| `AUDIT_URL`            | CI/CD-переменная (опционально)       | Адрес публикуемого приложения; по умолчанию Railway-деплой этого проекта                     |
 
-Раннер: docker executor с доступом в сеть (mise.run, npm registry, API GitLab). Минимальная версия GitLab для правил на dotenv-артефактах (`$TRUSTED`, `$WORK_PUBLISHED`) - 16.x.
+Раннер: docker executor с доступом в сеть (mise.run, npm registry, API GitLab). Джобы check и runtime-check используют node:24 (Debian) - на раннере нужен доступ к npm registry; e2e ставит chromium через playwright.
 
 ---
 

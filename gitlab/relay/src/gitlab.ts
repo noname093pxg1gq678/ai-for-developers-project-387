@@ -62,4 +62,54 @@ export class HttpGitlabClient implements GitlabClient {
       throw new Error(`GitLab API вернул ${res.status} на ${url}`);
     }
   }
+
+  async mrNotes(
+    projectId: number,
+    mrIid: number,
+  ): Promise<Array<{ id: number; body: string; username: string }>> {
+    // per_page=100 хватает для бюджета командных комментариев: важных
+    // последних заметок на MR заведомо меньше сотни
+    const url = apiUrl(
+      this.baseUrl,
+      `/projects/${projectId}/merge_requests/${mrIid}/notes?per_page=100`,
+    );
+    const res = await this.fetchImpl(url, {
+      headers: { "PRIVATE-TOKEN": this.token },
+    });
+    if (!res.ok) {
+      throw new Error(`GitLab API вернул ${res.status} на ${url}`);
+    }
+    const body = (await res.json()) as Array<{
+      id: number;
+      body: string;
+      author: { username: string };
+    }>;
+    return body.map((n) => ({
+      id: n.id,
+      body: n.body,
+      username: n.author.username,
+    }));
+  }
+
+  async postMrNote(
+    projectId: number,
+    mrIid: number,
+    body: string,
+  ): Promise<void> {
+    const url = apiUrl(
+      this.baseUrl,
+      `/projects/${projectId}/merge_requests/${mrIid}/notes`,
+    );
+    const res = await this.fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "PRIVATE-TOKEN": this.token,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) {
+      throw new Error(`GitLab API вернул ${res.status} на ${url}`);
+    }
+  }
 }

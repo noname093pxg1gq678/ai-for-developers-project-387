@@ -59,6 +59,16 @@ if [ "$member_ok" = "true" ] && [ "$trusted_bot" = true ]; then
         trusted=true
       fi
       ;;
+    merge_request)
+      # Авторевью MR: событие уже доверенное (релей отфильтровал ботов,
+      # неучастников, форки и черновики); guard перепроверяет ботов
+      trusted=true
+      ;;
+    mr_note)
+      if [ "$is_command" = true ] && [ -n "$command" ]; then
+        trusted=true
+      fi
+      ;;
   esac
 fi
 
