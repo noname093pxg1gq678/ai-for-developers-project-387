@@ -109,6 +109,40 @@ describe(".gitlab-ci.yml", () => {
     expect(removeIdx).toBeGreaterThan(fetchIdx);
   });
 
+  it("регрессия (ревью #40-1): agent не запускается на событиях авторевью merge_request", () => {
+    const rules = config.agent.rules.map((r: { if: string }) => r.if);
+    expect(rules).toContainEqual('$AGENT_EVENT == "note"');
+    expect(rules).toContainEqual('$AGENT_EVENT == "issue"');
+    expect(rules).toContainEqual('$AGENT_EVENT == "mr_note"');
+    expect(rules).not.toContainEqual("$AGENT_EVENT");
+    expect(rules).not.toContainEqual('$AGENT_EVENT == "merge_request"');
+  });
+
+  it("регрессия (ревью #40-2): ответ агента в MR-режиме уходит в MR, не в issue", () => {
+    const script = scriptOf("agent");
+    expect(script).toContain("merge_requests/${MR_IID}/notes");
+    expect(script).toContain("issues/${ISSUE_IID}/notes");
+    // Выбор endpoint по MR_IID: сначала MR-ветка, потом issue
+    const mrIdx = script.indexOf("merge_requests/${MR_IID}/notes");
+    const issueIdx = script.indexOf("issues/${ISSUE_IID}/notes");
+    expect(mrIdx).toBeGreaterThan(-1);
+    expect(issueIdx).toBeGreaterThan(-1);
+  });
+
+  it("регрессия (ревью #40-3): runtime-check проверяет head-коммит MR, не main", () => {
+    const script = scriptOf("runtime-check");
+    const fetchIdx = script.indexOf('git fetch origin "$MR_SOURCE_BRANCH"');
+    const revIdx = script.indexOf("rev-parse HEAD");
+    expect(fetchIdx).toBeGreaterThan(-1);
+    expect(revIdx).toBeGreaterThan(fetchIdx);
+    expect(script).toContain("git checkout FETCH_HEAD");
+  });
+
+  it("регрессия (ревью #40-4): плейсхолдер MR_SOURCE_BRANCH в правилах подставляется sed с |", () => {
+    const script = scriptOf("agent");
+    expect(script).toContain('sed "s|MR_SOURCE_BRANCH|${MR_SOURCE_BRANCH}|g"');
+  });
+
   it("publish: needs agent, пуш и MR токеном доставки; MR-режим обновляет ветку", () => {
     const job = config.publish;
     expect(job.needs).toContain("agent");

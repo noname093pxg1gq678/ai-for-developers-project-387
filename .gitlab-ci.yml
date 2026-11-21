@@ -93,7 +93,12 @@ agent:
   stage: agent
   needs: [guard-dotenv]
   rules:
-    - if: "$AGENT_EVENT"
+    # Агент - только на команды и триаж. События merge_request (авторевью)
+    # обслуживает джоба review: без этого ограничения на каждый MR
+    # запускался бы и agent с триаж-промптом по чужому iid
+    - if: '$AGENT_EVENT == "note"'
+    - if: '$AGENT_EVENT == "issue"'
+    - if: '$AGENT_EVENT == "mr_note"'
   timeout: 20m
   resource_group: "issue-$ISSUE_IID"
   script:
@@ -102,12 +107,14 @@ agent:
     - bash gitlab/scripts/agent-guard.sh > guard2.env
     - source guard2.env
     - '[ "$TRUSTED" = "true" ] || { echo "событие недоверенное - агент не запускается"; exit 0; }'
-    # Текст команды через файл: тело комментария может содержать кавычки и кириллицу
+    # Текст команды через файл: тело комментария может содержать кавычки и кириллицу.
+    # Плейсхолдеры правил подставляются sed с разделителем |: имя ветки MR
+    # содержит слэши, sed с разделителем / на подстановке падает
     - |
       if [ -n "$AGENT_COMMAND_B64" ]; then
         printf '%s\n' "$(printf '%s' "$AGENT_COMMAND_B64" | base64 -d)" > agent-command.txt
         if [ -n "${MR_IID:-}" ]; then
-          { cat agent-command.txt; printf '\n\n'; cat gitlab/agent-mr-rules-glab.txt; } > agent-prompt.txt
+          { cat agent-command.txt; printf '\n\n'; sed "s|MR_SOURCE_BRANCH|${MR_SOURCE_BRANCH}|g" gitlab/agent-mr-rules-glab.txt; } > agent-prompt.txt
         else
           { cat agent-command.txt; printf '\n\n'; cat gitlab/agent-rules-glab.txt; } > agent-prompt.txt
         fi
@@ -129,13 +136,20 @@ agent:
         echo "WORK_PUBLISHED=false" > agent.env
       fi
     # Ответ агента - комментарий в issue или MR; без ответа - fallback.
-    # Публикация выполняется всегда, даже при пустом ответе или падении
-    # предыдущих шагов: срыв доставки не оставляет работу невидимой.
+    # MR-режим (команда из комментария MR): endpoint MR, а не issue -
+    # у GitLab счётчики iid у issues и MR разные, issue с тем же номером
+    # был бы посторонним тредом. Публикация выполняется всегда, даже при
+    # пустом ответе: срыв доставки не оставляет работу невидимой.
     - |
-      if [ -s agent-answer.md ]; then
-        curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" --data-urlencode "body@agent-answer.md" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues/$ISSUE_IID/notes" > /dev/null
+      if [ -n "${MR_IID:-}" ]; then
+        NOTE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/${MR_IID}/notes"
       else
-        curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" --data-urlencode "body=Агент завершил работу без текстового ответа." "$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues/$ISSUE_IID/notes" > /dev/null
+        NOTE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues/${ISSUE_IID}/notes"
+      fi
+      if [ -s agent-answer.md ]; then
+        curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" --data-urlencode "body@agent-answer.md" "$NOTE_URL" > /dev/null
+      else
+        curl -sf --header "PRIVATE-TOKEN: $GITLAB_TOKEN" --data-urlencode "body=Агент завершил работу без текстового ответа." "$NOTE_URL" > /dev/null
       fi
   artifacts:
     when: always
@@ -244,7 +258,11 @@ runtime-check:
   variables:
     MISE_TRUSTED_CONFIG_PATHS: $CI_PROJECT_DIR
   script:
-    # SHA head-коммита фиксируется до сборки: артефакт доказывает свежесть
+    # Пайплайн от релея собирается на ref=main: чекаутим head-коммит MR до
+    # фиксации SHA, иначе e2e гонялся бы на main без изменений MR
+    - git fetch origin "$MR_SOURCE_BRANCH"
+    - git checkout FETCH_HEAD
+    # SHA head-коммита MR фиксируется до сборки: артефакт доказывает свежесть
     - git rev-parse HEAD | tee head-sha.txt
     - curl -fsSL https://mise.run | sh
     - export PATH="$HOME/.local/bin:$PATH"
