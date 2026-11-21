@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+backend/dist
+frontend/dist
+docs
+*.md
+mise.toml
+mise.lock
+hk.pkl

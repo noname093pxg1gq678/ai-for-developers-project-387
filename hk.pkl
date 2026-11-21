@@ -1,0 +1,42 @@
+amends "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtins.pkl"
+
+// oxfmt does not touch TOML: mise.toml is formatted by `mise fmt` (the "mise" step).
+// .agents/** is third-party skill content tracked by skills-lock.json: formatting it
+// breaks the content hashes, so it stays out of oxfmt and oxlint.
+local linters = new Mapping<String, Step> {
+  ["oxfmt"] = (Builtins.oxfmt) {
+    exclude = List("**/pnpm-lock.yaml", "**/package-lock.json", "**/*.toml", ".agents/**")
+  }
+  ["oxlint"] = (Builtins.ox_lint) {
+    exclude = List(".agents/**")
+  }
+  // hexlet-check.yml нельзя править, поэтому jactionlint его не проверяет и не фиксит
+  ["jactionlint"] = (Builtins.jactionlint) {
+    exclude = List("**/hexlet-check.yml")
+  }
+  ["mise"] = Builtins.mise
+}
+
+hooks = new {
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps = linters
+  }
+  ["pre-push"] {
+    steps = linters
+  }
+  ["check"] {
+    steps = linters
+  }
+  ["fix"] {
+    fix = true
+    steps = linters
+  }
+  ["commit-msg"] {
+    steps = new {
+      ["conventional-commit"] = Builtins.check_conventional_commit
+    }
+  }
+}

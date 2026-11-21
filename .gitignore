@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+coverage/
+
+# mise
+.mise.local.toml
+.mise/
+
+# env
+.env
+.env.*
+
+# misc
+*.log
+.DS_Store
+Thumbs.db
+
+# playwright
+test-results/
+playwright-report/

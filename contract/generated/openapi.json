@@ -1,0 +1,550 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Календарь звонков",
+    "version": "0.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/api/bookings": {
+      "post": {
+        "operationId": "Bookings_create",
+        "description": "Забронировать свободный слот.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Успешное бронирование слота.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meeting"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка валидации запроса.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Тип встречи или слот не найдены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Слот занят, тип встречи имеет будущие встречи или бронь пересекается с существующей встречей.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meeting-types": {
+      "get": {
+        "operationId": "MeetingTypes_listTypes",
+        "description": "Список типов встреч: по времени создания, новые сверху.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingType"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "MeetingTypes_createType",
+        "description": "Создать тип встречи.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Успешное создание типа встречи.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingType"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка валидации запроса.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingTypeInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meeting-types/{id}": {
+      "put": {
+        "operationId": "MeetingTypes_updateType",
+        "description": "Изменить тип встречи.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingType"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка валидации запроса.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Тип встречи или слот не найдены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingTypeInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "MeetingTypes_deleteType",
+        "description": "Удалить тип встречи. С будущими встречами удаление запрещено.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful. "
+          },
+          "404": {
+            "description": "Тип встречи или слот не найдены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Слот занят, тип встречи имеет будущие встречи или бронь пересекается с существующей встречей.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meeting-types/{typeId}/slots": {
+      "get": {
+        "operationId": "MeetingTypes_listSlots",
+        "description": "Свободные старты слотов в окне записи, UTC: окно - 14 календарных\nдней от текущего дня, прошедшие слоты исключены на момент запроса.",
+        "parameters": [
+          {
+            "name": "typeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Тип встречи или слот не найдены.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meetings": {
+      "get": {
+        "operationId": "Meetings_list",
+        "description": "Предстоящие встречи владельца по всем типам.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Meeting"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Ошибка API."
+      },
+      "BookingInput": {
+        "type": "object",
+        "required": [
+          "typeId",
+          "startsAt",
+          "guestName",
+          "guestEmail"
+        ],
+        "properties": {
+          "typeId": {
+            "type": "string",
+            "description": "Тип встречи."
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Старт свободного слота, UTC."
+          },
+          "guestName": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Имя гостя."
+          },
+          "guestEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "description": "Email гостя."
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Комментарий гостя."
+          }
+        },
+        "description": "Данные бронирования слота гостем."
+      },
+      "ConflictError": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Слот занят, тип встречи имеет будущие встречи или бронь пересекается с существующей встречей."
+      },
+      "GuestFields": {
+        "type": "object",
+        "required": [
+          "guestName",
+          "guestEmail"
+        ],
+        "properties": {
+          "guestName": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Имя гостя."
+          },
+          "guestEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "description": "Email гостя."
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Комментарий гостя."
+          }
+        },
+        "description": "Поля гостя, общие для брони и чтения встречи."
+      },
+      "Meeting": {
+        "type": "object",
+        "required": [
+          "id",
+          "typeId",
+          "typeTitle",
+          "startsAt",
+          "guestName",
+          "guestEmail"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Устойчивый идентификатор."
+          },
+          "typeId": {
+            "type": "string",
+            "description": "Тип встречи."
+          },
+          "typeTitle": {
+            "type": "string",
+            "description": "Название типа встречи на момент чтения."
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Старт слота, UTC."
+          },
+          "guestName": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Имя гостя."
+          },
+          "guestEmail": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "description": "Email гостя."
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Комментарий гостя."
+          }
+        },
+        "description": "Встреча - результат бронирования слота гостем."
+      },
+      "MeetingType": {
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt",
+          "title",
+          "description",
+          "durationMinutes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Устойчивый идентификатор."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Момент создания, UTC."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Название, например «Звонок на 45 минут»."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Описание для гостя."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 5,
+            "maximum": 240,
+            "description": "Длительность в минутах."
+          }
+        },
+        "description": "Тип встречи, опубликованный владельцем."
+      },
+      "MeetingTypeFields": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "durationMinutes"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Название, например «Звонок на 45 минут»."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Описание для гостя."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 5,
+            "maximum": 240,
+            "description": "Длительность в минутах."
+          }
+        },
+        "description": "Поля типа встречи, общие для чтения и записи."
+      },
+      "MeetingTypeInput": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "durationMinutes"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Название, например «Звонок на 45 минут»."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Описание для гостя."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 5,
+            "maximum": 240,
+            "description": "Длительность в минутах."
+          }
+        },
+        "description": "Данные типа встречи при создании и изменении."
+      },
+      "NotFoundError": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Тип встречи или слот не найдены."
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Ошибка валидации запроса."
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "API живёт на корне origin: в dev фронтенд проксирует /api, в контейнере то же origin",
+      "variables": {}
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "call-booking",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Сервис записи на звонок по мотивам Cal.com",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "contract:generate": "tsp compile contract/main.tsp && openapi-ts",
+    "contract:check": "npm run contract:generate && git diff --exit-code -- contract/generated frontend/src/api"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.99.0",
+    "@playwright/test": "^1.65.1",
+    "@typespec/compiler": "^1.18.0",
+    "@typespec/openapi3": "^1.18.0",
+    "typescript": "5.9"
+  },
+  "overrides": {
+    "@hey-api/json-schema-ref-parser": "1.4.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

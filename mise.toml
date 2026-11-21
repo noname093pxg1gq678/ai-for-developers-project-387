@@ -1,0 +1,84 @@
+min_version = "2026.11.8"
+
+[settings]
+experimental = true
+
+[tools]
+gh = "latest"
+hk = "2.12.0"
+jactionlint = "2.6.0"
+node = "24.22.1"
+oxfmt = "0.78.0"
+oxlint = "1.93.0"
+pitchfork = "2.34.0"
+
+[hooks]
+postinstall = "npm install"
+
+[tasks.setup]
+description = "Install dependencies and git hooks"
+run = ["npm install", "hk install"]
+
+[tasks."dev:backend"]
+hide = true
+dir = "backend"
+run = "npm run dev"
+
+[tasks."dev:frontend"]
+hide = true
+dir = "frontend"
+run = "npm run dev"
+
+[daemons.backend]
+task = "dev:backend"
+ready_port = 3000
+
+[daemons.frontend]
+task = "dev:frontend"
+ready_port = 5173
+
+[daemon_groups]
+default = ["backend", "frontend"]
+
+[tasks.dev]
+description = "Start dev servers: backend :3000, frontend :5173"
+daemons = true
+run = "mise daemons urls"
+
+[tasks.lint]
+description = "Lint and formatting check: oxlint, oxfmt, jactionlint, mise fmt"
+run = "hk check --all"
+
+[tasks.fix]
+description = "Apply automatic fixes (oxlint, oxfmt)"
+run = "hk fix --all"
+
+[tasks.typecheck]
+description = "Type-check backend and frontend"
+run = "npm run typecheck --workspaces"
+
+[tasks.build]
+description = "Build backend and frontend"
+run = "npm run build --workspaces"
+
+[tasks.test]
+description = "Run tests"
+run = "npm run test --workspaces"
+
+[tasks.e2e]
+description = "Build the app and run Playwright e2e tests against a real server"
+run = [
+  { task = "build" },
+  "npx playwright install chromium",
+  "npx playwright test",
+]
+
+[tasks.check]
+description = "Run every check: lint, types, build, tests, e2e"
+run = [
+  { task = "lint" },
+  { task = "typecheck" },
+  { task = "build" },
+  { task = "test" },
+  { task = "e2e" },
+]
