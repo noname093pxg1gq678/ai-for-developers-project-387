@@ -13,6 +13,7 @@ const TYPE_DESCRIPTION =
 const TYPE_DURATION_MINUTES = 45;
 const GUEST_NAME = "Мария Петрова";
 const GUEST_EMAIL = "maria@example.com";
+const GUEST_TOPIC = "Обсуждение проекта";
 const GUEST_COMMENT = "Хочу обсудить проект";
 
 test("гость записывается на слот, владелец видит бронь, слот закрывается", async ({
@@ -53,21 +54,23 @@ test("гость записывается на слот, владелец вид
   const slotLabel = (await firstSlot.textContent()) ?? "";
   await firstSlot.click();
 
+  await page.getByLabel("Тема разговора").fill(GUEST_TOPIC);
   await page.getByLabel("Имя").fill(GUEST_NAME);
   await page.getByLabel("Email").fill(GUEST_EMAIL);
   await page.getByLabel("Комментарий").fill(GUEST_COMMENT);
   await page.getByRole("button", { name: "Записаться" }).click();
 
-  // 5. Экран успеха с деталями встречи.
+  // 5. Экран успеха с деталями встречи: тема рядом с записью.
   await expect(
     page.getByRole("heading", { name: "Вы записаны" }),
   ).toBeVisible();
   await expect(page.getByText(TYPE_TITLE)).toBeVisible();
+  await expect(page.getByText(GUEST_TOPIC)).toBeVisible();
   await expect(page.getByText(GUEST_NAME)).toBeVisible();
   await expect(page.getByText(GUEST_COMMENT)).toBeVisible();
 
-  // 6. Панель владельца: бронь в «Предстоящих встречах» с гостем, датой
-  // и временем (время любое - проверяем факт записи).
+  // 6. Панель владельца: бронь в «Предстоящих встречах» с темой, гостем,
+  // датой и временем (время любое - проверяем факт записи).
   await page.goto("/admin");
   await expect(
     page.getByRole("heading", { name: "Предстоящие встречи" }),
@@ -75,6 +78,8 @@ test("гость записывается на слот, владелец вид
   const meetingCard = page.locator("li").filter({ hasText: GUEST_NAME });
   await expect(meetingCard).toBeVisible();
   await expect(meetingCard.getByText(TYPE_TITLE)).toBeVisible();
+  // Тема в карточке встречи заметно выделена перед именем гостя.
+  await expect(meetingCard.getByText(GUEST_TOPIC)).toBeVisible();
   await expect(meetingCard.getByText(GUEST_COMMENT)).toBeVisible();
   await expect(meetingCard.getByText(/\d{2}:\d{2}/)).toBeVisible();
 
