@@ -39,12 +39,14 @@ const BOOKING_ERROR_MESSAGE = "Не удалось выполнить брони
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 interface GuestForm {
+  topic: string;
   guestName: string;
   guestEmail: string;
   comment: string;
 }
 
 interface GuestFormErrors {
+  topic?: string;
   guestName?: string;
   guestEmail?: string;
   comment?: string;
@@ -52,6 +54,11 @@ interface GuestFormErrors {
 
 function validateGuestForm(form: GuestForm): GuestFormErrors {
   const errors: GuestFormErrors = {};
+  if (form.topic.trim().length === 0) {
+    errors.topic = "Тема разговора обязательна";
+  } else if (form.topic.length > 100) {
+    errors.topic = "Тема разговора не может быть длиннее 100 символов";
+  }
   if (form.guestName.trim().length === 0) {
     errors.guestName = "Имя гостя обязательно";
   } else if (form.guestName.length > 100) {
@@ -75,6 +82,7 @@ export default function BookingPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [form, setForm] = useState<GuestForm>({
+    topic: "",
     guestName: "",
     guestEmail: "",
     comment: "",
@@ -122,6 +130,7 @@ export default function BookingPage() {
       const meeting = await createBooking({
         typeId,
         startsAt: selectedSlot,
+        topic: form.topic,
         guestName: form.guestName,
         guestEmail: form.guestEmail,
         ...(form.comment.trim() === "" ? {} : { comment: form.comment }),
@@ -155,6 +164,7 @@ export default function BookingPage() {
             {booking.typeTitle}
           </Text>
           <Text>{formatMeetingDateTime(booking.startsAt)}</Text>
+          <Text fw={600}>{booking.topic}</Text>
           <Text>{booking.guestName}</Text>
           {booking.comment && <Text c="dimmed">{booking.comment}</Text>}
         </Stack>
@@ -274,6 +284,15 @@ export default function BookingPage() {
           }}
         >
           <Stack gap="sm">
+            <TextInput
+              label="Тема разговора"
+              value={form.topic}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setForm((current) => ({ ...current, topic: value }));
+              }}
+              error={formErrors.topic}
+            />
             <TextInput
               label="Имя"
               value={form.guestName}
