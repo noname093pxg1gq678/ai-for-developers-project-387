@@ -43,6 +43,11 @@ C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='/opencode   ' check 'prefix plus 
 # Кавычки, доллары и кириллица должны проходить в command без искажений
 C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='@agent кавычки "в кавычках" и $dollar и кириллица' check 'quotes, dollar, cyrillic' true 'кавычки "в кавычках" и $dollar и кириллица'
 
+# Кириллические гомоглифы в префиксе: на русской раскладке /oc печатается как /ос
+C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='/ос подтверждаю спеку и тикеты' check 'cyrillic /ос prefix' true 'подтверждаю спеку и тикеты'
+C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='@агент привет' check 'cyrillic @агент prefix' true 'привет'
+C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='/опенсоде что нового' check 'cyrillic /опенсоде prefix' true 'что нового'
+
 # Многострочная команда
 C_TYPE=User C_LOGIN=alice C_PERM=write C_BODY='@agent первая строка
 вторая строка' check 'multiline command' true 'первая строка
