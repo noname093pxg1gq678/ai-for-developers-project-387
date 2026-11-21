@@ -1,0 +1,83 @@
+name: agent
+
+on:
+  # jactionlint ignore=dangerous-triggers
+  # guard-джоба пускает дальше только доверенных комментаторов, секреты выдаются только agent-джобе
+  issue_comment:
+    types:
+      - created
+
+permissions: {}
+
+concurrency:
+  group: agent-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      trusted: ${{ steps.guard.outputs.trusted }}
+      command: ${{ steps.guard.outputs.command }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check commenter permission
+        id: permission
+        # Ботов не проверяем: они не доверенные в любом случае
+        if: github.event.comment.user.type != 'Bot'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          permission="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" --jq .permission)"
+          echo "permission=$permission" >> "$GITHUB_OUTPUT"
+
+      - name: Parse command
+        id: guard
+        env:
+          COMMENTER_TYPE: ${{ github.event.comment.user.type }}
+          COMMENTER_LOGIN: ${{ github.event.comment.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COLLABORATOR_PERMISSION: ${{ steps.permission.outputs.permission }}
+        run: bash .github/scripts/agent-guard.sh >> "$GITHUB_OUTPUT"
+
+  agent:
+    needs: guard
+    if: needs.guard.outputs.trusted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - run: mise run setup
+
+      # opencode-ai зафиксирован в mise.toml - mise-action ставит его вместе с остальными инструментами
+
+      - name: Run agent
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # Текст команды передаётся через временный файл: тело комментария
+          # может содержать кавычки и кириллицу, подстановка "$(cat ...)"
+          # не требует JSON-экранирования
+          AGENT_COMMAND: ${{ needs.guard.outputs.command }}
+        run: |
+          printf '%s\n' "$AGENT_COMMAND" > agent-command.txt
+          opencode run -m opencode-go/glm-5.3-flash "$(cat agent-command.txt)" > agent-answer.md
+
+      - name: Publish answer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body-file agent-answer.md

@@ -10,6 +10,7 @@
 - `mise run fix` - автофиксы линта и форматирования
 - `mise run e2e` - e2e-тесты Playwright: сборка, установка chromium, прогон браузерного сценария против настоящего сервера (собранное приложение одним процессом, без моков API)
 - По отдельности: `mise run test`, `mise run lint`, `mise run typecheck`, `mise run build`
+- Команды в issues (`@agent`, `/oc`, `/opencode`) запускают агента в GitHub Actions (`.github/workflows/agent.yml`); агент отвечает комментарием в issue
 
 Версии инструментов (node, hk, oxlint, oxfmt, pitchfork, jactionlint) зафиксированы в `mise.toml`; `mise install` их ставит, а mise-хук postinstall после установки запускает `npm install`.
 
