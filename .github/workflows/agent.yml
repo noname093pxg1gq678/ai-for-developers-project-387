@@ -55,6 +55,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,7 +86,28 @@ jobs:
           AGENT_COMMAND: ${{ needs.guard.outputs.command }}
         run: |
           printf '%s\n' "$AGENT_COMMAND" > agent-command.txt
-          opencode run -m opencode-go/glm-5.3-flash "$(cat agent-command.txt)" > agent-answer.md
+          printf '%s\n\n' "$(cat agent-command.txt)" > agent-prompt.txt
+          cat .github/scripts/agent-rules.txt >> agent-prompt.txt
+          opencode run -m opencode-go/glm-5.3-flash "$(cat agent-prompt.txt)" > agent-answer.md
+
+      # Доставка работы: модель коммитит в ветку и пишет её имя в
+      # agent-branch.txt, пуш делает этот шаг отдельным токеном из секрета -
+      # модель не держит право пуша. Без файла шаг пропускается.
+      - name: Publish work
+        if: hashFiles('agent-branch.txt') != ''
+        env:
+          PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          branch="$(tr -d '[:space:]' < agent-branch.txt)"
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
+          gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${ISSUE_NUMBER}" --body "Автоматическая работа агента по issue #${ISSUE_NUMBER}; ответ агента - в issue."
+
+      - name: Publish answer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body-file agent-answer.md
 
       - name: Publish answer
         env:
