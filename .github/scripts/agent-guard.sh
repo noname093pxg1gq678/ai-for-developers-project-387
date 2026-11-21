@@ -16,19 +16,14 @@
 # Боты (включая самого агента, отвечающего от github-actions[bot]) не доверенные:
 # воркфлоу не зацикливается. Секреты в guard-джобу не выдаются, форк-комментатор
 # и бот доверенность не проходят.
-set -euo pipefail
 
-type="${COMMENTER_TYPE:-}"
-body="${COMMENT_BODY:-}"
-permission="${COLLABORATOR_PERMISSION:-}"
+# Разбор команды переиспользует agent-budget.sh: он считает командные
+# комментарии в PR той же логикой (см. ниже).
+COMMAND_RE='^(@[аaгgеeнnтt]+|/[оo][сc]|/[оo][пp][еe][нn][сc][оo][дd]?[еe])([[:space:]]+(.*))?$'
 
-case "$permission" in
-  admin | maintain | write) trusted_permission=true ;;
-  *) trusted_permission=false ;;
-esac
-
-# Команда: тело начинается с префикса, затем пробельный разделитель или конец строки.
-# "@agentfoo" командой не считается. Текст после префикса - запрос агенту.
+# Разбирает тело комментария: код возврата 0 - это команда, её текст в COMMAND_TEXT.
+# Команда - тело с префиксом, затем пробельный разделитель или конец строки.
+# "@agentfoo" командой не считается; голый префикс без текста - тоже.
 #
 # Кириллические гомоглифы: на русской раскладке префиксы печатаются кириллицей
 # (/ос вместо /oc и так далее) - в проверке префикса латинские буквы допускают
@@ -36,27 +31,44 @@ esac
 # не транслитерируется. Внимание: при C-локали bracket-классы работают
 # побайтово, поэтому префикс может совпасть с похожим кириллическим началом -
 # допустимо, guard всё равно пускает только доверенных.
-re='^(@[аaгgеeнnтt]+|/[оo][сc]|/[оo][пp][еe][нn][сc][оo][дd]?[еe])([[:space:]]+(.*))?$'
-command=""
-is_command=false
-if [[ "$body" =~ $re ]]; then
-  is_command=true
-  command="${BASH_REMATCH[3]}"
-fi
+parse_command() {
+  [[ "$1" =~ $COMMAND_RE ]] || return 1
+  COMMAND_TEXT="${BASH_REMATCH[3]}"
+  [ -n "$COMMAND_TEXT" ]
+}
 
-trusted=false
-if [ "$is_command" = true ] &&
-  [ -n "$command" ] &&
-  [ "$type" != "Bot" ] &&
-  [ "$trusted_permission" = true ]; then
-  trusted=true
-fi
+guard_run() {
+  type="${COMMENTER_TYPE:-}"
+  body="${COMMENT_BODY:-}"
+  permission="${COLLABORATOR_PERMISSION:-}"
 
-echo "trusted=$trusted"
-if [ -n "$command" ]; then
-  echo "command<<__AGENT_COMMAND_EOF__"
-  printf '%s\n' "$command"
-  echo "__AGENT_COMMAND_EOF__"
-else
-  echo "command="
+  case "$permission" in
+    admin | maintain | write) trusted_permission=true ;;
+    *) trusted_permission=false ;;
+  esac
+
+  command=""
+  trusted=false
+  if parse_command "$body"; then
+    command="$COMMAND_TEXT"
+    if [ "$type" != "Bot" ] && [ "$trusted_permission" = true ]; then
+      trusted=true
+    fi
+  fi
+
+  echo "trusted=$trusted"
+  if [ -n "$command" ]; then
+    echo "command<<__AGENT_COMMAND_EOF__"
+    printf '%s\n' "$command"
+    echo "__AGENT_COMMAND_EOF__"
+  else
+    echo "command="
+  fi
+}
+
+# Сценарий вызывается и исполняется, и сорсится бюджет-скриптом (ради
+# parse_command) - основной код гоняется только при прямом запуске.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  set -euo pipefail
+  guard_run
 fi

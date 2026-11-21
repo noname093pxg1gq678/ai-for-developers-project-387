@@ -6,11 +6,17 @@ on:
   issue_comment:
     types:
       - created
+  # Комментарии к строкам PR - второй канал команд: обычный комментарий PR
+  # приходит как issue_comment (PR = issue), построчный - отдельным событием
+  pull_request_review_comment:
+    types:
+      - created
 
 permissions: {}
 
 concurrency:
-  group: agent-issue-${{ github.event.issue.number }}
+  group: agent-issue-${{ github.event.issue.number || github.event.pull_request.number }}
+  # Правка должна завершиться: новое событие не отменяет идущий прогон
   cancel-in-progress: false
 
 env:
@@ -22,11 +28,40 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       trusted: ${{ steps.guard.outputs.trusted }}
       command: ${{ steps.guard.outputs.command }}
+      is_pr: ${{ steps.pr.outputs.is_pr }}
+      number: ${{ steps.pr.outputs.number }}
+      checkout_ref: ${{ steps.pr.outputs.checkout_ref }}
+      budget_exhausted: ${{ steps.budget.outputs.budget_exhausted }}
+      last_sha: ${{ steps.budget.outputs.last_sha }}
+      head_branch: ${{ steps.budget.outputs.head_branch }}
+      review_file: ${{ steps.reviewctx.outputs.review_file }}
+      review_line: ${{ steps.reviewctx.outputs.review_line }}
+      review_patch: ${{ steps.reviewctx.outputs.review_patch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect PR context
+        id: pr
+        env:
+          # issue_comment на PR: PR = issue, у issue появляется объект pull_request;
+          # для построчного комментария событие несёт pull_request целиком
+          ISSUE_PR_JSON: ${{ toJSON(github.event.issue.pull_request) }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          number="${PULL_NUMBER:-${ISSUE_NUMBER:-}}"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          if { [ "$ISSUE_PR_JSON" != "null" ] && [ -n "$ISSUE_PR_JSON" ]; } || [ -n "$PULL_NUMBER" ]; then
+            echo "is_pr=true" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=refs/pull/${number}/head" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_pr=false" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check commenter permission
         id: permission
@@ -37,6 +72,64 @@ jobs:
         run: |
           permission="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" --jq .permission)"
           echo "permission=$permission" >> "$GITHUB_OUTPUT"
+
+      # Бюджет командных комментариев в PR (лимит 3): считаются команды
+      # доверенных не-ботов по обоим каналам (issue_comment и review_comment).
+      # Исчерпан - agent-джоба не запускается, публикует reject-джоба
+      - name: Check command budget
+        id: budget
+        if: steps.pr.outputs.is_pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=100" --paginate > issue-comments.json
+          [ -s issue-comments.json ] || echo '[]' > issue-comments.json
+          gh api "repos/$REPO/pulls/$PR_NUMBER/comments?per_page=100" --paginate > review-comments.json
+          [ -s review-comments.json ] || echo '[]' > review-comments.json
+          jq -s 'add' issue-comments.json review-comments.json > comments.json
+
+          # Право каждого не-бота комментатора - через collaborators API;
+          # право текущего комментатора определяется в бюджете той же проверкой
+          set -o pipefail
+          logins="$(jq -r '[.[] | select(.user.type != "Bot") | .user.login] | unique | .[]' comments.json | tr -d '\r')"
+          set +o pipefail
+          echo '{}' > perms.json
+          while IFS= read -r login; do
+            [ -n "$login" ] || continue
+            perm="$(gh api "repos/$REPO/collaborators/$login/permission" --jq .permission 2>/dev/null || echo '')"
+            jq --arg l "$login" --arg p "$perm" '. + {($l): $p}' perms.json > perms.json.tmp && mv perms.json.tmp perms.json
+          done <<< "$logins"
+
+          COMMENTS_JSON="$(jq --slurpfile p perms.json 'map(. + {author_permission: ($p[0][.user.login] // "")})' comments.json)"
+          export COMMENTS_JSON
+          bash .github/scripts/agent-budget.sh >> "$GITHUB_OUTPUT"
+
+          last_sha="$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)"
+          echo "last_sha=$last_sha" >> "$GITHUB_OUTPUT"
+          echo "head_branch=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.ref)" >> "$GITHUB_OUTPUT"
+
+      # Построчный канал: агент получает файл, строку и окружающий diff
+      - name: Extract review comment context
+        id: reviewctx
+        if: github.event_name == 'pull_request_review_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          COMMENT_PATH: ${{ github.event.comment.path }}
+          COMMENT_LINE: ${{ github.event.comment.line || github.event.comment.original_line || github.event.comment.position }}
+        run: |
+          gh api "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" > pr-files.json
+          patch="$(jq -r --arg f "$COMMENT_PATH" '[.[] | select(.filename == $f) | .patch // empty] | join("\n")' pr-files.json)"
+          {
+            echo "review_file=$COMMENT_PATH"
+            echo "review_line=$COMMENT_LINE"
+            echo "review_patch<<__REVIEW_PATCH_EOF__"
+            printf '%s\n' "$patch"
+            echo "__REVIEW_PATCH_EOF__"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Parse command
         id: guard
@@ -49,7 +142,8 @@ jobs:
 
   agent:
     needs: guard
-    if: needs.guard.outputs.trusted == 'true'
+    # Бюджет исчерпан - модель не вызывается, причину публикует reject-джоба
+    if: needs.guard.outputs.trusted == 'true' && (needs.guard.outputs.is_pr != 'true' || needs.guard.outputs.budget_exhausted != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -58,9 +152,11 @@ jobs:
       pull-requests: write
       id-token: write
     steps:
+      # Для PR-команды чекаутим head-ветку PR: агент правит её же
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ needs.guard.outputs.checkout_ref }}
 
       - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - run: mise run setup
@@ -75,6 +171,7 @@ jobs:
           node postinstall.mjs
 
       - name: Run agent
+        id: agent
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           # Агент управляет трекером по скиллам (triage, to-spec, to-tickets):
@@ -84,11 +181,63 @@ jobs:
           # может содержать кавычки и кириллицу, подстановка "$(cat ...)"
           # не требует JSON-экранирования
           AGENT_COMMAND: ${{ needs.guard.outputs.command }}
+          IS_PR: ${{ needs.guard.outputs.is_pr }}
+          PR_NUMBER: ${{ needs.guard.outputs.number }}
+          HEAD_BRANCH: ${{ needs.guard.outputs.head_branch }}
+          REVIEW_FILE: ${{ needs.guard.outputs.review_file }}
+          REVIEW_LINE: ${{ needs.guard.outputs.review_line }}
+          REVIEW_PATCH: ${{ needs.guard.outputs.review_patch }}
         run: |
           printf '%s\n' "$AGENT_COMMAND" > agent-command.txt
           printf '%s\n\n' "$(cat agent-command.txt)" > agent-prompt.txt
-          cat .github/scripts/agent-rules.txt >> agent-prompt.txt
-          opencode run -m opencode-go/glm-5.3-flash "$(cat agent-prompt.txt)" > agent-answer.md
+          if [ "$IS_PR" = "true" ]; then
+            sed "s/AGENT_PR_BRANCH/$HEAD_BRANCH/g" .github/scripts/agent-pr-rules.txt >> agent-prompt.txt
+            if [ -n "$REVIEW_FILE" ]; then
+              {
+                echo
+                echo "Команда пришла из комментария к строке PR: файл ${REVIEW_FILE}, строка ${REVIEW_LINE}."
+                echo "Окружающий diff этого файла:"
+                echo '```diff'
+                printf '%s\n' "$REVIEW_PATCH"
+                echo '```'
+              } >> agent-prompt.txt
+            fi
+          else
+            cat .github/scripts/agent-rules.txt >> agent-prompt.txt
+          fi
+
+          if [ -z "${OPENCODE_API_KEY:-}" ]; then
+            echo "reject_reason=infra" > agent-reject.txt
+            echo "Секрет OPENCODE_API_KEY пуст - модель недоступна" >&2
+            exit 1
+          fi
+
+          # Таймаут вызова модели меньше таймаута джобы: шаг отказа успевает
+          # опубликовать причину, код 124 команды timeout - причина timeout
+          set +e
+          timeout 900 opencode run -m opencode-go/glm-5.3-flash "$(cat agent-prompt.txt)" > agent-answer.md
+          rc=$?
+          set -e
+          if [ "$rc" -eq 124 ]; then
+            echo "reject_reason=timeout" > agent-reject.txt
+            exit 1
+          elif [ "$rc" -ne 0 ]; then
+            echo "reject_reason=agent_failed" > agent-reject.txt
+            exit 1
+          fi
+
+      # Причина отказа публикуется без модели
+      - name: Publish failure reason
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.guard.outputs.number }}
+          LAST_SHA: ${{ needs.guard.outputs.last_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -f agent-reject.txt ] || exit 0
+          reason="$(cat agent-reject.txt)"
+          gh issue comment "$NUMBER" --body "Команда не выполнена: \`${reason}\`.${LAST_SHA:+ Последний SHA: ${LAST_SHA}.} Логи: ${RUN_URL}"
 
       # Доставка работы: модель коммитит в ветку и пишет её имя в
       # agent-branch.txt, пуш делает этот шаг отдельным токеном из секрета -
@@ -98,22 +247,52 @@ jobs:
         env:
           PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          NUMBER: ${{ needs.guard.outputs.number }}
+          IS_PR: ${{ needs.guard.outputs.is_pr }}
         run: |
           branch="$(tr -d '[:space:]' < agent-branch.txt)"
+          # PR от github-actions[bot] не запускает новые воркфлоу, поэтому пуш
+          # всегда под токеном владельца: head-ветка PR обновляется и CI стартует
           git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
-          gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${ISSUE_NUMBER}" --body "Автоматическая работа агента по issue #${ISSUE_NUMBER}; ответ агента - в issue."
+          if [ "$IS_PR" = "true" ]; then
+            gh pr comment "$NUMBER" --body "Агент запушил изменения в head-ветку PR: ${branch}. Повторное ревью запустится с новым push."
+          else
+            gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${NUMBER}" --body "Автоматическая работа агента по issue #${NUMBER}; ответ агента - в issue."
+          fi
 
       - name: Publish answer
         env:
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          NUMBER: ${{ needs.guard.outputs.number }}
+          IS_PR: ${{ needs.guard.outputs.is_pr }}
         run: |
           # Ответ агента может быть пустым (вся работа ушла в инструменты) -
           # тогда публикуем fallback со ссылкой на результат
           if [ -s agent-answer.md ]; then
-            gh issue comment "$ISSUE_NUMBER" --body-file agent-answer.md
+            gh issue comment "$NUMBER" --body-file agent-answer.md
+          elif [ "$IS_PR" = "true" ]; then
+            branch="$(tr -d '[:space:]' < agent-branch.txt 2>/dev/null || echo none)"
+            gh issue comment "$NUMBER" --body "Агент завершил работу без текстового ответа; результат - коммиты в ветке ${branch} этого PR."
           else
             pr_url="$(gh pr list --head "$(tr -d '[:space:]' < agent-branch.txt 2>/dev/null || echo none)" --json url --jq '.[0].url' 2>/dev/null || true)"
-            gh issue comment "$ISSUE_NUMBER" --body "Агент завершил работу без текстового ответа${pr_url:+; результат: $pr_url}."
+            gh issue comment "$NUMBER" --body "Агент завершил работу без текстового ответа${pr_url:+; результат: $pr_url}."
           fi
+
+  # Бюджет командных комментариев исчерпан: публикуем причину без вызова модели
+  reject:
+    needs: guard
+    if: needs.guard.outputs.trusted == 'true' && needs.guard.outputs.is_pr == 'true' && needs.guard.outputs.budget_exhausted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Publish limit exhausted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.guard.outputs.number }}
+          LAST_SHA: ${{ needs.guard.outputs.last_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue comment "$NUMBER" --body "Бюджет командных комментариев в этом PR исчерпан (лимит 3). Причина: \`limit_exhausted\`, модель не вызывалась. Последний SHA: ${LAST_SHA}. Логи: ${RUN_URL}"
