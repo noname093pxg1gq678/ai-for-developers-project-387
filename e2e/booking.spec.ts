@@ -68,6 +68,11 @@ test("гость записывается на слот, владелец вид
   await expect(page.getByText(GUEST_TOPIC)).toBeVisible();
   await expect(page.getByText(GUEST_NAME)).toBeVisible();
   await expect(page.getByText(GUEST_COMMENT)).toBeVisible();
+  // Скриншот экрана успеха - артефакт проверки работающей версии (issue #16).
+  await page.screenshot({
+    path: "e2e-artifacts/success-screen.png",
+    fullPage: true,
+  });
 
   // 6. Панель владельца: бронь в «Предстоящих встречах» с темой, гостем,
   // датой и временем (время любое - проверяем факт записи).
