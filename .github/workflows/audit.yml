@@ -1,0 +1,154 @@
+name: audit
+
+# Плановый аудит опубликованного приложения (Railway): Lighthouse собирает
+# отчёт, агент разбирает его и создаёт issue по конкретной находке.
+# Отчёт - артефакт прогона, в коммиты не попадает.
+
+on:
+  schedule:
+    # 06:17 по Москве (03:17 UTC), раз в сутки
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      training_finding:
+        description: "Учебный отчёт с подготовленной находкой (демо создания issue)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: audit-app
+  cancel-in-progress: false
+
+env:
+  AUDIT_URL: https://call-booking-production-85a10cee.up.railway.app
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      collected: ${{ steps.collect.outputs.collected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Chromium для Lighthouse: тот же браузер, что в e2e
+      - name: Install chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Lighthouse
+        id: collect
+        run: |
+          set -o pipefail
+          chrome="$(find ~/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -n 1)"
+          export CHROME_PATH="$chrome"
+          # Недоступность приложения - не пустой прогон, а данные об
+          # отсутствии: агент размечает это отдельно (это не подтверждает
+          # исправление дефекта). Поэтому падение не роняет джобу.
+          if npx --yes lighthouse@12 "$AUDIT_URL" \
+            --quiet --chrome-flags="--headless=new --no-sandbox" \
+            --output=json --output-path=audit-report.json \
+            --only-categories=performance,accessibility,best-practices,seo; then
+            echo "collected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "collected=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: audit-report-${{ github.run_id }}
+          path: audit-report.json
+          if-no-files-found: ignore
+
+  analyze:
+    needs: collect
+    # Запускается и при отсутствии данных: агент обязан обозначить
+    # недоступность приложения отдельным выводом
+    if: always() && needs.collect.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - run: mise run setup
+
+      - name: Finalize opencode install
+        run: |
+          root="$(mise where npm:opencode-ai)"
+          postinstall="$(find "$root" -name postinstall.mjs -path '*opencode-ai*' | head -n 1)"
+          cd "$(dirname "$postinstall")"
+          node postinstall.mjs
+
+      - name: Run audit agent
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # Агент создаёт issue по находке: токен джобы с issues: write.
+          # Пуш-прав нет: аудит не меняет код
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_URL: ${{ env.AUDIT_URL }}
+          RUN_URL: ${{ env.RUN_URL }}
+          TRAINING_FINDING: ${{ inputs.training_finding || 'false' }}
+        run: |
+          cat > audit-prompt.txt <<'PROMPT'
+          Проведи плановый аудит приложения по Lighthouse-отчёту audit-report.json.
+
+          Проверяемое приложение: URL из переменной AUDIT_URL. Ссылка на прогон: RUN_URL.
+
+          Правила разбора:
+          1. Прочитай audit-report.json: категории (performance, accessibility, best-practices, seo), оценки, упавшие аудиты (score < 0.9).
+          2. Если TRAINING_FINDING = true - вместо реального разбора используй учебную находку: «Performance score 45: LCP 8.2s на странице записи» (явно учебные данные, не подтверждённый дефект приложения).
+          3. По каждой находке проверь дубли среди открытых issues: gh issue list --state open --search "<ключевые слова находки>". Если открытое issue по той же проблеме есть и новых сведений нет - не создавай дубль, только упомяни его в выводе.
+          4. Новой находки нет среди открытых - создай отдельный issue: проблема (что и где), предлагаемое действие, связь с отчётом (ссылка на прогон и путь к отчёту в артефактах). Для учебной находки пометь issue словом «учебный» и укажи, что это не подтверждённый дефект.
+          5. Повторное появление исправленной проблемы: среди ЗАКРЫТЫХ issues (gh issue list --state closed) проверь, нет ли по той же проблеме закрытого issue, исправленного PR-ом. Совпадение находки с прежней задачей и исправляющим PR оформи как регрессию: в новом issue ссылки на оба и пометка «регрессия».
+          6. Отсутствие данных: если отчёт пустой, повреждён или приложение недоступно - обозначь это отдельно и явно. Недоступность НЕ подтверждает исправление дефекта; issue по находке в этом случае не создавай.
+          7. Итоговый вывод: находка либо отсутствие находок либо отсутствие данных, что сделано (issue создан / дубль не нужен / нет находок / нет данных), ссылка на прогон.
+          Код не меняй, ветки не создавай.
+          PROMPT
+          printf '%s\n' "Адрес приложения: ${AUDIT_URL}. Ссылка на прогон: ${RUN_URL}. Учебный режим: ${TRAINING_FINDING}." >> audit-prompt.txt
+          opencode run -m opencode-go/glm-5.3-flash "$(cat audit-prompt.txt)" > audit-answer.md
+
+      - name: Publish summary
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Итог каждого прогона публикуется в тикете аудита: находки -
+          # отдельные issues, а краткий вывод с ссылкой на прогон - здесь
+          ISSUE_NUMBER: 24
+          RUN_URL: ${{ env.RUN_URL }}
+        run: |
+          # Итог каждого прогона - комментарий в трекинг-issue; находки -
+          # отдельные issues. Пустой ответ или падение агента - fallback
+          # со ссылкой на прогон.
+          if [ -s audit-answer.md ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "$(printf '%s\n\nАудит прогона: %s' "$(cat audit-answer.md)" "$RUN_URL")"
+          else
+            gh issue comment "$ISSUE_NUMBER" --body "Плановый аудит: ответ агента не получен (шаг анализа завершился ошибкой); отчёт - в артефактах, прогон: $RUN_URL."
+          fi
+
+      # Артефакт в конце: отчёт и ответ агента сохраняются независимо от
+      # результата анализа
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: audit-analysis-${{ github.run_id }}
+          path: |
+            audit-report.json
+            audit-answer.md
+          if-no-files-found: warn
