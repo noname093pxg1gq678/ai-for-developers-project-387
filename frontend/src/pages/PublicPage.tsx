@@ -74,7 +74,7 @@ export default function PublicPage() {
         </Stack>
       )}
       {status === "ready" && types.length === 0 && (
-        <Text c="dimmed" ta="center">
+        <Text c="gray.7" ta="center">
           Пока нет доступных типов встреч
         </Text>
       )}
@@ -92,10 +92,10 @@ export default function PublicPage() {
               <Text size="lg" fw={600}>
                 {type.title}
               </Text>
-              <Text size="sm" c="dimmed">
+              <Text size="sm" c="gray.7">
                 {type.description}
               </Text>
-              <Text size="sm" c="dimmed" mt="xs">
+              <Text size="sm" c="gray.7" mt="xs">
                 {formatDuration(type.durationMinutes)}
               </Text>
             </Card>
