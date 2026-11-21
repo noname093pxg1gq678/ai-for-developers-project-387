@@ -3,3 +3,5 @@
 export const OWNER_NAME = "Алексей Иванов";
 
 export const PUBLIC_PAGE_TITLE = `${OWNER_NAME} - запись на встречу`;
+
+export const PUBLIC_PAGE_DESCRIPTION = `${OWNER_NAME} приглашает на встречи: посмотрите типы звонков и запишитесь на свободный слот.`;

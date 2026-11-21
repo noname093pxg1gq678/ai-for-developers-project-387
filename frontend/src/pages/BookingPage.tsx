@@ -18,12 +18,14 @@ import {
   PublicApiError,
 } from "../data/publicApi";
 import type { Meeting } from "../api";
+import { PUBLIC_PAGE_DESCRIPTION } from "../config";
 import {
   bookingWindowDays,
   formatSlotTime,
   groupSlotsByDay,
 } from "../lib/days";
 import { formatDuration, formatMeetingDateTime } from "../lib/format";
+import { setMetaDescription } from "../lib/meta";
 import { useLoad } from "../lib/useLoad";
 
 const BOOKING_PAGE_TITLE = "Запись на встречу";
@@ -103,6 +105,18 @@ export default function BookingPage() {
     typesLoad.status === "ready"
       ? (typesLoad.data.find((type) => type.id === typeId) ?? null)
       : null;
+
+  // Описание страницы зависит от типа: когда тип известен, в meta description
+  // подставляется его название, до загрузки - общее описание (issue #27).
+  useEffect(() => {
+    if (meetingType) {
+      setMetaDescription(
+        `${meetingType.title} - запись на встречу. Выберите свободный слот и оставьте контакты.`,
+      );
+      return;
+    }
+    setMetaDescription(PUBLIC_PAGE_DESCRIPTION);
+  }, [meetingType]);
 
   // Календарь-полоса от текущего дня; свободные старты группируются по дням.
   const days = bookingWindowDays();

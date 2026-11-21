@@ -9,9 +9,14 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { OWNER_NAME, PUBLIC_PAGE_TITLE } from "../config";
+import {
+  OWNER_NAME,
+  PUBLIC_PAGE_DESCRIPTION,
+  PUBLIC_PAGE_TITLE,
+} from "../config";
 import { loadMeetingTypes } from "../data/publicApi";
 import { formatDuration } from "../lib/format";
+import { setMetaDescription } from "../lib/meta";
 
 import type { MeetingType } from "../api";
 
@@ -26,6 +31,7 @@ export default function PublicPage() {
 
   useEffect(() => {
     document.title = PUBLIC_PAGE_TITLE;
+    setMetaDescription(PUBLIC_PAGE_DESCRIPTION);
   }, []);
 
   useEffect(() => {

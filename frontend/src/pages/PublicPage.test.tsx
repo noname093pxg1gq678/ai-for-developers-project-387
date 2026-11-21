@@ -49,6 +49,18 @@ describe("публичная страница", () => {
     expect(document.title).toBe("Алексей Иванов - запись на встречу");
   });
 
+  it("подставляет описание страницы в meta description документа", () => {
+    loadMock.mockResolvedValue(SAMPLE_TYPES);
+    renderPage();
+
+    expect(
+      document.head.querySelector<HTMLMetaElement>('meta[name="description"]')
+        ?.content,
+    ).toBe(
+      "Алексей Иванов приглашает на встречи: посмотрите типы звонков и запишитесь на свободный слот.",
+    );
+  });
+
   it("показывает карточки типов с описанием и длительностью", async () => {
     loadMock.mockResolvedValue(SAMPLE_TYPES);
     renderPage();
