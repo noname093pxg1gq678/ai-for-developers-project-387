@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -80,6 +80,33 @@ afterEach(() => {
 });
 
 describe("страница записи", () => {
+  it("подставляет название типа в meta description после загрузки", async () => {
+    renderAt("/book/call-45");
+
+    expect(await screen.findByText("Звонок на 45 минут")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        document.head.querySelector<HTMLMetaElement>('meta[name="description"]')
+          ?.content,
+      ).toContain("Звонок на 45 минут");
+    });
+  });
+
+  it("для неизвестного типа meta description остаётся общим описанием", async () => {
+    typesMock.mockResolvedValue([]);
+    renderAt("/book/unknown");
+
+    expect(
+      await screen.findByText("Тип встречи не найден"),
+    ).toBeInTheDocument();
+    expect(
+      document.head.querySelector<HTMLMetaElement>('meta[name="description"]')
+        ?.content,
+    ).toBe(
+      "Алексей Иванов приглашает на встречи: посмотрите типы звонков и запишитесь на свободный слот.",
+    );
+  });
+
   it("показывает заголовок, название, описание и длительность типа", async () => {
     renderAt("/book/call-45");
 
