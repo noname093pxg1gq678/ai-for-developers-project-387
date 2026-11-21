@@ -142,7 +142,7 @@ describe("панель владельца - создание типа", () => {
     renderPage();
 
     await user.click(
-      await screen.findByRole("button", { name: "Создать тип" }),
+      await screen.findByRole("button", { name: "Новый тип встречи" }),
     );
 
     const modal = await screen.findByRole("dialog", {
@@ -176,7 +176,7 @@ describe("панель владельца - создание типа", () => {
     renderPage();
 
     await user.click(
-      await screen.findByRole("button", { name: "Создать тип" }),
+      await screen.findByRole("button", { name: "Новый тип встречи" }),
     );
     const modal = await screen.findByRole("dialog", {
       name: "Новый тип встречи",
@@ -203,7 +203,7 @@ describe("панель владельца - создание типа", () => {
     renderPage();
 
     await user.click(
-      await screen.findByRole("button", { name: "Создать тип" }),
+      await screen.findByRole("button", { name: "Новый тип встречи" }),
     );
     const modal = await screen.findByRole("dialog", {
       name: "Новый тип встречи",
