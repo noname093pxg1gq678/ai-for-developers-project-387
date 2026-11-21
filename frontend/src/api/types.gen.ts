@@ -32,6 +32,10 @@ export type BookingInput = {
      */
     guestEmail: string;
     /**
+     * Тема разговора, короткая однострочная строка о предмете звонка.
+     */
+    topic: string;
+    /**
      * Комментарий гостя.
      */
     comment?: string;
@@ -56,6 +60,10 @@ export type GuestFields = {
      * Email гостя.
      */
     guestEmail: string;
+    /**
+     * Тема разговора, короткая однострочная строка о предмете звонка.
+     */
+    topic: string;
     /**
      * Комментарий гостя.
      */
@@ -90,6 +98,10 @@ export type Meeting = {
      * Email гостя.
      */
     guestEmail: string;
+    /**
+     * Тема разговора, короткая однострочная строка о предмете звонка.
+     */
+    topic: string;
     /**
      * Комментарий гостя.
      */

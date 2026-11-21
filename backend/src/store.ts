@@ -23,6 +23,7 @@ export interface MeetingRecord {
   startsAt: string;
   guestName: string;
   guestEmail: string;
+  topic: string;
   comment?: string;
 }
 

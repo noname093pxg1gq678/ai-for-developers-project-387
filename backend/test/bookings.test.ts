@@ -41,6 +41,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсуждение проекта",
         comment: "Хочу обсудить проект",
       },
     });
@@ -52,6 +53,7 @@ describe("бронирование слота через API", () => {
     expect(meeting.startsAt).toBe("2026-11-16T06:00:00.000Z");
     expect(meeting.guestName).toBe("Мария Петрова");
     expect(meeting.guestEmail).toBe("maria@example.com");
+    expect(meeting.topic).toBe("Обсуждение проекта");
     expect(meeting.comment).toBe("Хочу обсудить проект");
     expect(meeting.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -70,6 +72,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T09:00:00+03:00",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -87,6 +90,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсуждение проекта",
       },
     });
 
@@ -98,6 +102,7 @@ describe("бронирование слота через API", () => {
     expect(meetings[0].typeTitle).toBe("Звонок на 45 минут");
     expect(meetings[0].startsAt).toBe("2026-11-16T06:00:00.000Z");
     expect(meetings[0].guestName).toBe("Мария Петрова");
+    expect(meetings[0].topic).toBe("Обсуждение проекта");
   });
 
   it("ошибки валидации отвечают 400 без создания встречи", async () => {
@@ -108,18 +113,21 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
       {
         typeId,
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "и".repeat(101),
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
       {
         typeId,
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария",
         guestEmail: "не-почта",
+        topic: "Обсудить проект",
       },
       { typeId, startsAt: "2026-11-16T06:00:00Z", guestName: "Мария" },
       {
@@ -127,6 +135,27 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария",
         guestEmail: "maria@example.com",
+      },
+      {
+        typeId,
+        startsAt: "2026-11-16T06:00:00Z",
+        guestName: "Мария",
+        guestEmail: "maria@example.com",
+        topic: "",
+      },
+      {
+        typeId,
+        startsAt: "2026-11-16T06:00:00Z",
+        guestName: "Мария",
+        guestEmail: "maria@example.com",
+        topic: "т".repeat(101),
+      },
+      {
+        typeId,
+        startsAt: "2026-11-16T06:00:00Z",
+        guestName: "Мария",
+        guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
         comment: "к".repeat(501),
       },
       {
@@ -134,11 +163,13 @@ describe("бронирование слота через API", () => {
         startsAt: "не-момент",
         guestName: "Мария",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
       {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     ];
 
@@ -165,6 +196,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -185,6 +217,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T04:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -207,6 +240,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-21T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -226,6 +260,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:10:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -245,6 +280,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-30T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -262,6 +298,7 @@ describe("бронирование слота через API", () => {
       startsAt: "2026-11-16T07:00:00Z",
       guestName: "Анна Кузнецова",
       guestEmail: "anna@example.com",
+      topic: "Обсудить проект",
     });
 
     // Бронь на 30 минут с 10:30 целиком внутри существующей встречи.
@@ -273,6 +310,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T07:30:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -290,6 +328,7 @@ describe("бронирование слота через API", () => {
       startsAt: "2026-11-16T07:45:00Z",
       guestName: "Анна Кузнецова",
       guestEmail: "anna@example.com",
+      topic: "Обсудить проект",
     });
 
     const response = await app.inject({
@@ -300,6 +339,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T08:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -324,6 +364,7 @@ describe("бронирование слота через API", () => {
       startsAt: "2026-11-16T07:45:00Z",
       guestName: "Анна Кузнецова",
       guestEmail: "anna@example.com",
+      topic: "Обсудить проект",
     });
 
     const response = await app.inject({
@@ -334,6 +375,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T08:30:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       },
     });
 
@@ -365,6 +407,7 @@ describe("бронирование слота через API", () => {
         startsAt: "2026-11-16T06:00:00Z",
         guestName: "Мария Петрова",
         guestEmail: "maria@example.com",
+        topic: "Обсудить проект",
       };
 
       const responses = await Promise.all(
@@ -392,12 +435,14 @@ describe("бронирование слота через API", () => {
           startsAt: "2026-11-16T06:00:00Z",
           guestName: "Мария Петрова",
           guestEmail: "maria@example.com",
+          topic: "Обсудить проект",
         }),
         booking(app, {
           typeId,
           startsAt: "2026-11-16T07:00:00Z",
           guestName: "Анна Кузнецова",
           guestEmail: "anna@example.com",
+          topic: "Обсудить проект",
         }),
       ]);
 
@@ -414,12 +459,14 @@ describe("бронирование слота через API", () => {
           startsAt: "2026-11-16T06:00:00Z",
           guestName: "Мария Петрова",
           guestEmail: "maria@example.com",
+          topic: "Обсудить проект",
         }),
         booking(app, {
           typeId: secondTypeId,
           startsAt: "2026-11-16T06:30:00Z",
           guestName: "Анна Кузнецова",
           guestEmail: "anna@example.com",
+          topic: "Обсудить проект",
         }),
       ]);
 

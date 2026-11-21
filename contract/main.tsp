@@ -55,6 +55,10 @@ model GuestFields {
   @pattern("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
   guestEmail: string;
 
+  /** Тема разговора, короткая однострочная строка о предмете звонка. */
+  @maxLength(100)
+  topic: string;
+
   /** Комментарий гостя. */
   @maxLength(500)
   comment?: string;

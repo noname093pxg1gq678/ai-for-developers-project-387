@@ -339,6 +339,7 @@ const SAMPLE_MEETINGS: Meeting[] = [
     typeId: "call-45",
     typeTitle: "Звонок на 45 минут",
     startsAt: "2026-11-18T09:00:00Z",
+    topic: "Обсуждение проекта",
     guestName: "Мария Петрова",
     guestEmail: "maria@example.com",
     comment: "Хочу обсудить проект",
@@ -348,13 +349,14 @@ const SAMPLE_MEETINGS: Meeting[] = [
     typeId: "intro-call",
     typeTitle: "Вводный звонок",
     startsAt: "2026-11-19T14:00:00Z",
+    topic: "Знакомство",
     guestName: "Иван Смирнов",
     guestEmail: "ivan@example.com",
   },
 ];
 
 describe("панель владельца - предстоящие встречи", () => {
-  it("показывает встречи: название, гостя, комментарий, дату и время в поясе владельца", async () => {
+  it("показывает встречи: тему, гостя, комментарий, дату и время в поясе владельца", async () => {
     loadMeetingsMock.mockResolvedValue(SAMPLE_MEETINGS);
     renderPage();
 
@@ -362,15 +364,41 @@ describe("панель владельца - предстоящие встреч�
     expect(items).toHaveLength(2);
 
     const first = itemByTitle("Звонок на 45 минут");
+    // Тема заметно выделена и идёт перед именем гостя (issue #4).
+    expect(within(first).getByText("Обсуждение проекта")).toBeInTheDocument();
     expect(within(first).getByText("Мария Петрова")).toBeInTheDocument();
     expect(within(first).getByText("Хочу обсудить проект")).toBeInTheDocument();
     // 09:00 UTC = 12:00 в Europe/Moscow (ADR 0002).
     expect(within(first).getByText("18.11.2026, 12:00")).toBeInTheDocument();
 
     const second = itemByTitle("Вводный звонок");
+    expect(within(second).getByText("Знакомство")).toBeInTheDocument();
     expect(within(second).getByText("Иван Смирнов")).toBeInTheDocument();
     // Без комментария лишнего текста нет.
     expect(within(second).queryByText(/обсудить/)).toBeNull();
+  });
+
+  it("тема отображается до имени гостя в карточке встречи", async () => {
+    loadMeetingsMock.mockResolvedValue(SAMPLE_MEETINGS);
+    renderPage();
+
+    await screen.findAllByRole("listitem");
+    const first = itemByTitle("Звонок на 45 минут");
+    const topic = within(first).getByText("Обсуждение проекта");
+    const guest = within(first).getByText("Мария Петрова");
+
+    expect(topic.compareDocumentPosition(guest)).toBeGreaterThan(0);
+  });
+
+  it("встреча без темы не ломает карточку", async () => {
+    loadMeetingsMock.mockResolvedValue([{ ...SAMPLE_MEETINGS[0], topic: "" }]);
+    renderPage();
+
+    const items = await screen.findAllByRole("listitem");
+    expect(items).toHaveLength(1);
+    const first = itemByTitle("Звонок на 45 минут");
+    expect(within(first).getByText("Мария Петрова")).toBeInTheDocument();
+    expect(within(first).queryByText("Обсуждение проекта")).toBeNull();
   });
 
   it("рендерит встречи в порядке API - по возрастанию времени начала", async () => {

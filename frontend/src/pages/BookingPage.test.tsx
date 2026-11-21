@@ -39,6 +39,7 @@ const SAMPLE_MEETING: Meeting = {
   typeId: "call-45",
   typeTitle: "Звонок на 45 минут",
   startsAt: "2026-11-16T06:00:00.000Z",
+  topic: "Обсуждение проекта",
   guestName: "Мария Петрова",
   guestEmail: "maria@example.com",
   comment: "Хочу обсудить проект",
@@ -206,13 +207,14 @@ describe("страница записи", () => {
 });
 
 describe("форма гостя", () => {
-  it("появляется после выбора слота: имя, email, комментарий", async () => {
+  it("появляется после выбора слота: тема, имя, email, комментарий", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderAt("/book/call-45");
 
     await user.click(await screen.findByRole("button", { name: "09:00" }));
 
-    expect(await screen.findByLabelText("Имя")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Тема разговора")).toBeInTheDocument();
+    expect(screen.getByLabelText("Имя")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Комментарий")).toBeInTheDocument();
     expect(
@@ -225,7 +227,7 @@ describe("форма гостя", () => {
     renderAt("/book/call-45");
 
     await user.click(await screen.findByRole("button", { name: "09:00" }));
-    await user.type(await screen.findByLabelText("Имя"), "и".repeat(101));
+    await user.type(screen.getByLabelText("Имя"), "и".repeat(101));
     await user.type(screen.getByLabelText("Email"), "не-почта");
     await user.type(screen.getByLabelText("Комментарий"), "к".repeat(501));
     await user.click(screen.getByRole("button", { name: "Записаться" }));
@@ -247,7 +249,28 @@ describe("форма гостя", () => {
     await user.click(await screen.findByRole("button", { name: "09:00" }));
     await user.click(screen.getByRole("button", { name: "Записаться" }));
 
-    expect(screen.getAllByText(/обязательно/)).not.toHaveLength(0);
+    expect(screen.getAllByText(/обязательн/)).not.toHaveLength(0);
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("тема разговора: ошибка при пустом значении и при значении длиннее 100 символов, без отправки", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAt("/book/call-45");
+
+    await user.click(await screen.findByRole("button", { name: "09:00" }));
+    await user.type(await screen.findByLabelText("Имя"), "Мария Петрова");
+    await user.type(screen.getByLabelText("Email"), "maria@example.com");
+    await user.click(screen.getByRole("button", { name: "Записаться" }));
+
+    expect(screen.getAllByText(/Тема разговора обязательна/)).toHaveLength(1);
+    expect(createMock).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Тема разговора"), "т".repeat(101));
+    await user.click(screen.getByRole("button", { name: "Записаться" }));
+
+    expect(
+      screen.getAllByText(/Тема разговора не может быть длиннее 100 символов/),
+    ).toHaveLength(1);
     expect(createMock).not.toHaveBeenCalled();
   });
 
@@ -257,6 +280,10 @@ describe("форма гостя", () => {
     renderAt("/book/call-45");
 
     await user.click(await screen.findByRole("button", { name: "09:00" }));
+    await user.type(
+      await screen.findByLabelText("Тема разговора"),
+      "Обсуждение проекта",
+    );
     await user.type(await screen.findByLabelText("Имя"), "Мария Петрова");
     await user.type(screen.getByLabelText("Email"), "maria@example.com");
     await user.type(
@@ -268,6 +295,7 @@ describe("форма гостя", () => {
     expect(createMock).toHaveBeenCalledWith({
       typeId: "call-45",
       startsAt: "2026-11-16T06:00:00.000Z",
+      topic: "Обсуждение проекта",
       guestName: "Мария Петрова",
       guestEmail: "maria@example.com",
       comment: "Хочу обсудить проект",
@@ -278,6 +306,7 @@ describe("форма гостя", () => {
     // Дата и время в поясе владельца: 06:00 UTC = 09:00 по Europe/Moscow.
     expect(screen.getByText("Звонок на 45 минут")).toBeInTheDocument();
     expect(screen.getByText("16.11.2026, 09:00")).toBeInTheDocument();
+    expect(screen.getByText("Обсуждение проекта")).toBeInTheDocument();
     expect(screen.getByText("Мария Петрова")).toBeInTheDocument();
     expect(screen.getByText("Хочу обсудить проект")).toBeInTheDocument();
     expect(
@@ -294,6 +323,10 @@ describe("форма гостя", () => {
     renderAt("/book/call-45");
 
     await user.click(await screen.findByRole("button", { name: "09:00" }));
+    await user.type(
+      await screen.findByLabelText("Тема разговора"),
+      "Обсуждение проекта",
+    );
     await user.type(await screen.findByLabelText("Имя"), "Мария Петрова");
     await user.type(screen.getByLabelText("Email"), "maria@example.com");
     await user.click(screen.getByRole("button", { name: "Записаться" }));
@@ -301,6 +334,7 @@ describe("форма гостя", () => {
     expect(createMock).toHaveBeenCalledWith({
       typeId: "call-45",
       startsAt: "2026-11-16T06:00:00.000Z",
+      topic: "Обсуждение проекта",
       guestName: "Мария Петрова",
       guestEmail: "maria@example.com",
     });
@@ -312,6 +346,10 @@ describe("форма гостя", () => {
 describe("гонка брони", () => {
   async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole("button", { name: "09:00" }));
+    await user.type(
+      await screen.findByLabelText("Тема разговора"),
+      "Обсуждение проекта",
+    );
     await user.type(await screen.findByLabelText("Имя"), "Мария Петрова");
     await user.type(screen.getByLabelText("Email"), "maria@example.com");
     await user.click(screen.getByRole("button", { name: "Записаться" }));
