@@ -32,8 +32,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    outputs:
-      collected: ${{ steps.collect.outputs.collected }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,9 +54,9 @@ jobs:
             --quiet --chrome-flags="--headless=new --no-sandbox" \
             --output=json --output-path=audit-report.json \
             --only-categories=performance,accessibility,best-practices,seo; then
-            echo "collected=true" >> "$GITHUB_OUTPUT"
+            echo "Отчёт собран"
           else
-            echo "collected=false" >> "$GITHUB_OUTPUT"
+            echo "Отчёт не собран - приложение недоступно или Lighthouse упал; агент размечает это как отсутствие данных"
           fi
 
       - name: Upload report artifact
