@@ -84,6 +84,10 @@ describe("HttpGitlabClient: triggerPipeline", () => {
       AGENT_ISSUE_AUTHOR: "reporter",
       ISSUE_IID: "42",
       ISSUE_AUTHOR: "reporter",
+      MR_IID: "",
+      MR_SOURCE_BRANCH: "",
+      MR_TARGET_BRANCH: "",
+      MR_TITLE: "",
     });
 
     expect(fake.calls).toHaveLength(1);
@@ -127,7 +131,86 @@ describe("HttpGitlabClient: triggerPipeline", () => {
         AGENT_ISSUE_AUTHOR: "r",
         ISSUE_IID: "1",
         ISSUE_AUTHOR: "r",
+        MR_IID: "",
+        MR_SOURCE_BRANCH: "",
+        MR_TARGET_BRANCH: "",
+        MR_TITLE: "",
       }),
     ).rejects.toThrow(/GitLab API/);
+  });
+});
+
+describe("HttpGitlabClient: mrNotes", () => {
+  it("GET merge_requests/:iid/notes, возвращает id/body/username", async () => {
+    const fake = makeFetch({
+      status: 200,
+      body: JSON.stringify([
+        { id: 400, body: "@agent работа", author: { username: "alice" } },
+        { id: 401, body: "спасибо", author: { username: "bob" } },
+      ]),
+    });
+    const client = new HttpGitlabClient(
+      "https://gitlab.example.com",
+      "relay-token",
+      fake.fetchImpl,
+    );
+
+    const notes = await client.mrNotes(7, 12);
+
+    expect(notes).toEqual([
+      { id: 400, body: "@agent работа", username: "alice" },
+      { id: 401, body: "спасибо", username: "bob" },
+    ]);
+    expect(fake.calls[0]?.url).toBe(
+      "https://gitlab.example.com/api/v4/projects/7/merge_requests/12/notes?per_page=100",
+    );
+    const headers = fake.calls[0]?.init.headers as Record<string, string>;
+    expect(headers["PRIVATE-TOKEN"]).toBe("relay-token");
+  });
+
+  it("ошибка API бросает исключение", async () => {
+    const fake = makeFetch({ status: 500, body: "{}" });
+    const client = new HttpGitlabClient(
+      "https://gitlab.example.com",
+      "relay-token",
+      fake.fetchImpl,
+    );
+
+    await expect(client.mrNotes(7, 12)).rejects.toThrow(/GitLab API/);
+  });
+});
+
+describe("HttpGitlabClient: postMrNote", () => {
+  it("POST merge_requests/:iid/notes с телом комментария", async () => {
+    const fake = makeFetch({ status: 201, body: '{"id":500}' });
+    const client = new HttpGitlabClient(
+      "https://gitlab.example.com",
+      "relay-token",
+      fake.fetchImpl,
+    );
+
+    await client.postMrNote(7, 12, "Бюджет командных комментариев исчерпан");
+
+    expect(fake.calls[0]?.url).toBe(
+      "https://gitlab.example.com/api/v4/projects/7/merge_requests/12/notes",
+    );
+    expect(fake.calls[0]?.init.method).toBe("POST");
+    const body = JSON.parse(String(fake.calls[0]?.init.body)) as {
+      body: string;
+    };
+    expect(body.body).toBe("Бюджет командных комментариев исчерпан");
+  });
+
+  it("ошибка API бросает исключение", async () => {
+    const fake = makeFetch({ status: 400, body: "{}" });
+    const client = new HttpGitlabClient(
+      "https://gitlab.example.com",
+      "relay-token",
+      fake.fetchImpl,
+    );
+
+    await expect(client.postMrNote(7, 12, "текст")).rejects.toThrow(
+      /GitLab API/,
+    );
   });
 });
