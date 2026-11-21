@@ -76,6 +76,9 @@ jobs:
       - name: Run agent
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          # Агент управляет трекером по скиллам (triage, to-spec, to-tickets):
+          # токен джобы с issues: write. Guard-джоба пускает только доверенных
+          GH_TOKEN: ${{ github.token }}
           # Текст команды передаётся через временный файл: тело комментария
           # может содержать кавычки и кириллицу, подстановка "$(cat ...)"
           # не требует JSON-экранирования
