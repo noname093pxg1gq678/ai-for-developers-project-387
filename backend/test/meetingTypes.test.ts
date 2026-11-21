@@ -153,6 +153,7 @@ describe("CRUD типов встреч через API", () => {
       startsAt: "2099-01-01T09:00:00Z",
       guestName: "Гость",
       guestEmail: "guest@example.com",
+      topic: "Обсудить проект",
     });
     seedMeeting({
       id: crypto.randomUUID(),
@@ -160,6 +161,7 @@ describe("CRUD типов встреч через API", () => {
       startsAt: "2020-01-01T09:00:00Z",
       guestName: "Гость",
       guestEmail: "guest@example.com",
+      topic: "Обсудить проект",
     });
 
     const forbidden = await app.inject({
@@ -275,6 +277,7 @@ describe("CRUD типов встреч через API", () => {
       startsAt: `${shifted.toISOString().slice(0, 19)}+14:00`,
       guestName: "Гость",
       guestEmail: "guest@example.com",
+      topic: "Обсудить проект",
     });
 
     const removed = await app.inject({

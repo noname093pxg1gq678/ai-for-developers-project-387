@@ -55,6 +55,7 @@ export interface BookingBody {
   startsAt: string;
   guestName: string;
   guestEmail: string;
+  topic: string;
   comment?: string;
 }
 
@@ -62,6 +63,7 @@ export type BookingValidation = { input: BookingBody } | { error: string };
 
 /** Валидация брони по контракту: тип обязателен, старт - момент UTC,
  * имя гостя обязательное до 100 символов, email обязательный с паттерном,
+ * тема разговора обязательная до 100 символов (issue #4),
  * комментарий опциональный до 500 символов.
  */
 export function validateBookingBody(body: unknown): BookingValidation {
@@ -72,7 +74,7 @@ export function validateBookingBody(body: unknown): BookingValidation {
     };
   }
   const record = body as Record<string, unknown>;
-  const { typeId, startsAt, guestName, guestEmail, comment } = record;
+  const { typeId, startsAt, guestName, guestEmail, topic, comment } = record;
 
   if (typeof typeId !== "string" || typeId.length === 0) {
     return { error: "Тип встречи обязателен" };
@@ -88,6 +90,12 @@ export function validateBookingBody(body: unknown): BookingValidation {
   }
   if (typeof guestEmail !== "string" || !EMAIL_PATTERN.test(guestEmail)) {
     return { error: "Email гостя обязателен и должен быть корректным" };
+  }
+  if (typeof topic !== "string" || topic.length === 0) {
+    return { error: "Тема разговора обязательна" };
+  }
+  if (topic.length > 100) {
+    return { error: "Тема разговора не может быть длиннее 100 символов" };
   }
   if (comment !== undefined) {
     if (typeof comment !== "string") {
@@ -105,6 +113,7 @@ export function validateBookingBody(body: unknown): BookingValidation {
       startsAt: new Date(startsAt).toISOString(),
       guestName,
       guestEmail,
+      topic,
       ...(comment === undefined ? {} : { comment }),
     },
   };

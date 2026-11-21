@@ -131,6 +131,7 @@ describe("свободные слоты через API", () => {
       startsAt: "2026-11-16T08:00:00Z",
       guestName: "Гость",
       guestEmail: "guest@example.com",
+      topic: "Обсудить проект",
     });
 
     const response = await app.inject({

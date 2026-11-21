@@ -306,7 +306,8 @@
           "typeId",
           "startsAt",
           "guestName",
-          "guestEmail"
+          "guestEmail",
+          "topic"
         ],
         "properties": {
           "typeId": {
@@ -327,6 +328,11 @@
             "type": "string",
             "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
             "description": "Email гостя."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Тема разговора, короткая однострочная строка о предмете звонка."
           },
           "comment": {
             "type": "string",
@@ -352,7 +358,8 @@
         "type": "object",
         "required": [
           "guestName",
-          "guestEmail"
+          "guestEmail",
+          "topic"
         ],
         "properties": {
           "guestName": {
@@ -364,6 +371,11 @@
             "type": "string",
             "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
             "description": "Email гостя."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Тема разговора, короткая однострочная строка о предмете звонка."
           },
           "comment": {
             "type": "string",
@@ -381,7 +393,8 @@
           "typeTitle",
           "startsAt",
           "guestName",
-          "guestEmail"
+          "guestEmail",
+          "topic"
         ],
         "properties": {
           "id": {
@@ -410,6 +423,11 @@
             "type": "string",
             "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
             "description": "Email гостя."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Тема разговора, короткая однострочная строка о предмете звонка."
           },
           "comment": {
             "type": "string",

@@ -43,6 +43,7 @@ describe("предстоящие встречи через API", () => {
       startsAt: "2099-01-02T10:00:00Z",
       guestName: "Мария Петрова",
       guestEmail: "maria@example.com",
+      topic: "Обсудить проект",
       comment: "Хочу обсудить проект",
     });
     seedMeeting({
@@ -51,6 +52,7 @@ describe("предстоящие встречи через API", () => {
       startsAt: "2020-01-01T09:00:00Z",
       guestName: "Иван Смирнов",
       guestEmail: "ivan@example.com",
+      topic: "Обсудить проект",
     });
     seedMeeting({
       id: "earlier",
@@ -58,6 +60,7 @@ describe("предстоящие встречи через API", () => {
       startsAt: "2099-01-01T09:00:00Z",
       guestName: "Анна Кузнецова",
       guestEmail: "anna@example.com",
+      topic: "Обсудить проект",
     });
 
     const list = await app.inject({ method: "GET", url: "/api/meetings" });
@@ -86,6 +89,7 @@ describe("предстоящие встречи через API", () => {
       startsAt: "2099-01-01T10:00:00Z",
       guestName: "Иван Смирнов",
       guestEmail: "ivan@example.com",
+      topic: "Обсудить проект",
     });
 
     await app.inject({
@@ -123,6 +127,7 @@ describe("предстоящие встречи через API", () => {
       startsAt: "2099-01-02T05:00:00+14:00",
       guestName: "Иван Смирнов",
       guestEmail: "ivan@example.com",
+      topic: "Обсудить проект",
     });
 
     const list = await app.inject({ method: "GET", url: "/api/meetings" });
