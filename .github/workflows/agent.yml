@@ -92,7 +92,9 @@ jobs:
 
           # Право каждого не-бота комментатора - через collaborators API;
           # право текущего комментатора определяется в бюджете той же проверкой
+          set -o pipefail
           logins="$(jq -r '[.[] | select(.user.type != "Bot") | .user.login] | unique | .[]' comments.json | tr -d '\r')"
+          set +o pipefail
           echo '{}' > perms.json
           while IFS= read -r login; do
             [ -n "$login" ] || continue
