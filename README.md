@@ -1,6 +1,5 @@
 # Календарь звонков (продолжение)
 
-
 [![hexlet-check](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/actions)
 
 Интегрируйте работу агентов в GitHub проект
