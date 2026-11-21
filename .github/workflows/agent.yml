@@ -107,9 +107,13 @@ jobs:
       - name: Publish answer
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "${{ github.event.issue.number }}" --body-file agent-answer.md
-
-      - name: Publish answer
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "${{ github.event.issue.number }}" --body-file agent-answer.md
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          # Ответ агента может быть пустым (вся работа ушла в инструменты) -
+          # тогда публикуем fallback со ссылкой на результат
+          if [ -s agent-answer.md ]; then
+            gh issue comment "$ISSUE_NUMBER" --body-file agent-answer.md
+          else
+            pr_url="$(gh pr list --head "$(tr -d '[:space:]' < agent-branch.txt 2>/dev/null || echo none)" --json url --jq '.[0].url' 2>/dev/null || true)"
+            gh issue comment "$ISSUE_NUMBER" --body "Агент завершил работу без текстового ответа${pr_url:+; результат: $pr_url}."
+          fi
