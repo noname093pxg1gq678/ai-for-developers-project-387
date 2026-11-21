@@ -191,7 +191,7 @@ jobs:
           printf '%s\n' "$AGENT_COMMAND" > agent-command.txt
           printf '%s\n\n' "$(cat agent-command.txt)" > agent-prompt.txt
           if [ "$IS_PR" = "true" ]; then
-            sed "s/AGENT_PR_BRANCH/$HEAD_BRANCH/g" .github/scripts/agent-pr-rules.txt >> agent-prompt.txt
+            sed "s|AGENT_PR_BRANCH|$HEAD_BRANCH|g" .github/scripts/agent-pr-rules.txt >> agent-prompt.txt
             if [ -n "$REVIEW_FILE" ]; then
               {
                 echo
