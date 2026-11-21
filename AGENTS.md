@@ -9,7 +9,7 @@
 - `mise run check` - все проверки: линт (oxlint, oxfmt, jactionlint, mise fmt), типы (tsc), сборка, тесты (vitest), e2e (Playwright). Эту же команду запускает CI
 - `mise run fix` - автофиксы линта и форматирования
 - `mise run e2e` - e2e-тесты Playwright: сборка, установка chromium, прогон браузерного сценария против настоящего сервера (собранное приложение одним процессом, без моков API)
-- По отдельности: `mise run test`, `mise run lint`, `mise run typecheck`, `mise run build`; тесты и типы релея GitLab-контура (отдельный пакет, не workspace): `mise run test:relay`
+- По отдельности: `mise run test`, `mise run lint`, `mise run typecheck`, `mise run build`; релей GitLab-контура (отдельный пакет, не workspace): `mise run test:relay` (тесты и типы) и `mise run test:guard` (smoke-тесты guard-скрипта)
 - Команды в issues (`@agent`, `/oc`, `/opencode`) запускают агента в GitHub Actions (`.github/workflows/agent.yml`); агент отвечает комментарием в issue
 
 Версии инструментов (node, hk, oxlint, oxfmt, pitchfork, jactionlint) зафиксированы в `mise.toml`; `mise install` их ставит, а mise-хук postinstall после установки запускает `npm install`.

@@ -71,6 +71,10 @@ description = "Install deps and run gitlab relay tests and typecheck (standalone
 dir = "gitlab/relay"
 run = ["npm install", "npm run typecheck", "npm test"]
 
+[tasks."test:guard"]
+description = "Run gitlab agent-guard.sh smoke tests (bash)"
+run = "bash gitlab/scripts/agent-guard.test.sh"
+
 [tasks.e2e]
 description = "Build the app and run Playwright e2e tests against a real server"
 run = [
@@ -87,5 +91,6 @@ run = [
   { task = "build" },
   { task = "test" },
   { task = "test:relay" },
+  { task = "test:guard" },
   { task = "e2e" },
 ]
