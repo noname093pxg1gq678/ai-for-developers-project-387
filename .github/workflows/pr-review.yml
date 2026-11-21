@@ -149,6 +149,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Record head SHA
+        shell: bash
         run: |
           git rev-parse HEAD | tee head-sha.txt
           echo "Ожидаемый head PR: ${{ github.event.pull_request.head.sha }}"
