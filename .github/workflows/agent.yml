@@ -64,7 +64,14 @@ jobs:
       - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       - run: mise run setup
 
-      # opencode-ai зафиксирован в mise.toml - mise-action ставит его вместе с остальными инструментами
+      # opencode-ai зафиксирован в mise.toml - mise-action ставит его вместе с остальными инструментами.
+      # mise ставит npm-пакеты без postinstall, а он скачивает бинарник платформы - запускаем вручную
+      - name: Finalize opencode install
+        run: |
+          root="$(mise where npm:opencode-ai)"
+          postinstall="$(find "$root" -name postinstall.mjs -path '*opencode-ai*' | head -n 1)"
+          cd "$(dirname "$postinstall")"
+          node postinstall.mjs
 
       - name: Run agent
         env:
