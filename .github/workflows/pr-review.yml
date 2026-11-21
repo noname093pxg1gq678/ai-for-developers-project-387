@@ -133,3 +133,37 @@ jobs:
           else
             gh pr comment "$PR_NUMBER" --body "Авторевью завершилось без текстового ответа; лог прогона - в Actions."
           fi
+
+  # Проверка работающей версии из точного head SHA: сборка и e2e против
+  # приложения из этого коммита, скриншот и SHA - в артефакте Actions.
+  # Без секрета модели: это детерминированный браузерный прогон, а не ревью.
+  runtime-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Record head SHA
+        run: |
+          git rev-parse HEAD | tee head-sha.txt
+          echo "Ожидаемый head PR: ${{ github.event.pull_request.head.sha }}"
+
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+      - run: mise run setup
+      - run: npm run build --workspaces
+
+      - run: mise run e2e
+
+      - name: Upload verification artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540478e92f5e2c4dcd4f0ea0 # v4.6.2
+        with:
+          name: runtime-check-${{ github.event.pull_request.head.sha }}
+          path: |
+            head-sha.txt
+            e2e-artifacts/
+          if-no-files-found: warn
