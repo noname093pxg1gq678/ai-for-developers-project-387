@@ -253,14 +253,19 @@ jobs:
           branch="$(tr -d '[:space:]' < agent-branch.txt)"
           # Пуш и создание PR - оба под токеном владельца: PR от github-actions[bot]
           # не запускает новые воркфлоу (авторевью уходит в action_required)
-          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"
+          if ! git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/${branch}"; then
+            gh issue comment "$NUMBER" --body "Агент сдал работу, но запушить ветку ${branch} не удалось (сбой Publish work). Коммиты сохранены в артефактах прогона; проверьте срок действия и права PUSH_TOKEN." && exit 1 || exit 1
+          fi
           if [ "$IS_PR" = "true" ]; then
             gh pr comment "$NUMBER" --body "Агент запушил изменения в head-ветку PR: ${branch}. Повторное ревью запустится с новым push."
-          else
-            GH_TOKEN="$PUSH_TOKEN" gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${NUMBER}" --body "Автоматическая работа агента по issue #${NUMBER}; ответ агента - в issue."
+          elif ! GH_TOKEN="$PUSH_TOKEN" gh pr create --head "${branch}" --base main --title "Агент: работа по issue #${NUMBER}" --body "Автоматическая работа агента по issue #${NUMBER}; ответ агента - в issue."; then
+            # Сбой создания PR не должен оставить работу невидимой: ветка уже
+            # запушена, человек откроет PR вручную и увидит причину в issue
+            gh issue comment "$NUMBER" --body "Агент сдал работу: изменения запушены в ветку ${branch}, но создать PR не удалось (сбой Publish work). Откройте PR вручную из этой ветки; вероятная причина - права PUSH_TOKEN (создание PR требует Pull requests: read and write)."
           fi
 
       - name: Publish answer
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ needs.guard.outputs.number }}
