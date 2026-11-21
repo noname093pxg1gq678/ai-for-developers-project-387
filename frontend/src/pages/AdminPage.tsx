@@ -201,7 +201,7 @@ export default function AdminPage() {
 
       <Group justify="space-between" mb="md">
         <Title order={2}>Типы встреч</Title>
-        <Button onClick={openCreate}>Создать тип</Button>
+        <Button onClick={openCreate}>Новый тип встречи</Button>
       </Group>
 
       {status === "loading" && (
