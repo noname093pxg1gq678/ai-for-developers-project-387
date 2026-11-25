@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/compare/v1.1.0...v1.2.0) (2026-11-25)
+
+
+### Features
+
+* **gitlab:** полный перенос воркфлоу контура в .gitlab-ci.yml ([#15](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/15)) ([0d26fb3](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/0d26fb30124cf7f240bc96aef72570aeeaa0e0c9))
+* **gitlab:** полный перенос воркфлоу контура в .gitlab-ci.yml ([#15](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/15)) ([76b8f79](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/76b8f7914eeda66cf10754827179fd456d5996e7))
+
+
+### Bug Fixes
+
+* **gitlab:** замечания авторевью [#40](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/issues/40) - агент не на MR-событиях, ответ в MR, runtime-check на head, sed-подстановка ([63ab2a1](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/commit/63ab2a1899f2de5a3f17ee5df89251c4855a33b1))
+
 ## [1.1.0](https://github.com/noname093pxg1gq678/ai-for-developers-project-387/compare/v1.0.0...v1.1.0) (2026-11-21)
 
 
